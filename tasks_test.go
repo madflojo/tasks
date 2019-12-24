@@ -1,9 +1,9 @@
 package tasks
 
 import (
+	"fmt"
 	"testing"
 	"time"
-  "fmt"
 )
 
 func TestAdd(t *testing.T) {
@@ -121,6 +121,42 @@ func TestScheduler(t *testing.T) {
 				continue
 			case <-time.After(2 * time.Second):
 				if i > 2 {
+					return
+				}
+				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+			}
+		}
+	})
+
+	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{})
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval: time.Duration(1 * time.Second),
+			RunOnce:  true,
+			TaskFunc: func() error {
+				doneCh <- struct{}{}
+				return nil
+			},
+			ErrFunc: func(e error) { return },
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+		defer scheduler.Del(id)
+
+		// Make sure it runs especially when we want it too
+		for i := 0; i < 6; i++ {
+			select {
+			case <-doneCh:
+				if i >= 1 {
+					t.Errorf("Task should not have exceeded 1, count is %d", i)
+				}
+				continue
+			case <-time.After(2 * time.Second):
+				if i == 1 {
 					return
 				}
 				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)

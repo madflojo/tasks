@@ -183,7 +183,7 @@ func TestScheduler(t *testing.T) {
 		case <-doneCh:
 			return
 		case <-time.After(2 * time.Second):
-			t.Errorf("Error function was not called when an error occured")
+			t.Errorf("Error function was not called when an error occurred")
 		}
 	})
 }

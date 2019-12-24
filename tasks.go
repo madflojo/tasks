@@ -82,8 +82,8 @@ type Task struct {
 	Interval time.Duration
 
 	// RunOnce is used to set this task as a single execution task. By default, tasks will continue executing at
-	// the interval specified until deleted. With RunOnce enabled the first execution of the task will result in the task self
-	// deleting.
+	// the interval specified until deleted. With RunOnce enabled the first execution of the task will result in 
+  // the task self deleting.
 	RunOnce bool
 
 	// TaskFunc is the user defined function to execute as part of this task.
@@ -120,8 +120,8 @@ func New() *Scheduler {
 }
 
 // Add will add a task to the task list and schedule it. Once added, tasks will wait the defined time interval and then
-// execute. This means a task with a 15 second interval will be triggered 15 seconds after Add is complete. Not before or
-// after (excluding typical machine time jitter).
+// execute. This means a task with a 15 second interval will be triggered 15 seconds after Add is complete. Not before 
+// or after (excluding typical machine time jitter).
 //
 //  // Add a task
 //  id, err := scheduler.Add(&tasks.Task{

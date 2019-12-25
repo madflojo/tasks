@@ -220,9 +220,7 @@ func (schd *Scheduler) Del(name string) {
 	// Remove from task list
 	schd.Lock()
 	defer schd.Unlock()
-	if _, ok := schd.tasks[name]; ok {
-		delete(schd.tasks, name)
-	}
+	delete(schd.tasks, name)
 }
 
 // Lookup will find the specified task from the internal task list using the task ID provided.

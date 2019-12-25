@@ -42,6 +42,7 @@ a certain time. The below example shows this in practice.
 	})
 	if err != nil {
 		// Do Stuff
+	}
 
 It is also common for applications to run a task only once. The below example shows scheduling a task to run only once after
 waiting for 60 seconds.
@@ -56,6 +57,7 @@ waiting for 60 seconds.
 	})
 	if err != nil {
 		// Do Stuff
+	}
 
 One powerful feature of Tasks is that it allows users to specify custom error handling. This is done by allowing users to
 define a function that is called when a task returns an error. The below example shows scheduling a task that logs when an

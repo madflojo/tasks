@@ -1,11 +1,17 @@
 /*
-Package tasks is an easy to use in-process task scheduler for Go.
+Package tasks is an easy to use in-process task scheduler for Go. Focused on interval based execution, Tasks
+provides both recurring and one-time task scheduling.
 
-This package provides both recurring and one-time task execution. Tasks are run within their own goroutine which
-improves time accuracy for execution. This package also allows users to specify error handling though custom error
-functions.
+Tasks is focused on accuracy of task execution. To do this each task is called within it's own goroutine.
+This ensures that long execution of a single invocation does not throw the schedule as a whole off track.
 
-Below is a simple example of starting the scheduler and registering a new task.
+As usage of this scheduler scales, it is expected to have a larger number of sleeping goroutines. As it is
+designed to leverage Go's ability to optimize goroutine CPU scheduling.
+
+For simplicity this task scheduler uses the time.Duration type to specify intervals. This allows for a simple
+interface and flexible control over when tasks are executed.
+
+Below is an example of starting the scheduler and registering a new task that runs every 30 seconds.
 
 	// Start the Scheduler
 	scheduler := tasks.New()
@@ -17,31 +23,52 @@ Below is a simple example of starting the scheduler and registering a new task.
 		TaskFunc: func() error {
 			// Put your logic here
 		}(),
-		ErrFunc: func(err error) {
-			// Put custom error handling here
-		}(),
 	})
 	if err != nil {
 		// Do Stuff
 	}
 
-For simplicity this task scheduler uses the time.Duration type to specify intervals. This allows for a simple interface
-and flexible control over when tasks are executed.
 
-The below example shows scheduling a task to run only once 30 days from now.
+Sometimes schedules need to started at a later time. This package provides the ability to start a task only after
+a certain time. The below example shows this in practice.
 
-	// Define time to execute
-	t := time.Now().Add(30 * (24 * time.Hour))
-
-	// Add a one time only task for 30 days from now
+	// Add a recurring task for every 30 days, starting 30 days from now
 	id, err := scheduler.Add(&tasks.Task{
-		Interval: time.Until(t),
+		Interval: time.Duration(30 * (24 * time.Hour)),
+		StartAfter: time.Now().Add(30 * (24 * time.Hour)),
+		TaskFunc: func() error {
+			// Put your logic here
+		}(),
+	})
+	if err != nil {
+		// Do Stuff
+
+It is also common for applications to run a task only once. The below example shows scheduling a task to run only once after
+waiting for 60 seconds.
+
+	// Add a one time only task for 60 seconds from now
+	id, err := scheduler.Add(&tasks.Task{
+		Interval: time.Duration(60 * time.Second)
 		RunOnce:  true,
 		TaskFunc: func() error {
 			// Put your logic here
 		}(),
-		ErrFunc: func(err error) {
-			// Put custom error handling here
+	})
+	if err != nil {
+		// Do Stuff
+
+One powerful feature of Tasks is that it allows users to specify custom error handling. This is done by allowing users to
+define a function that is called when a task returns an error. The below example shows scheduling a task that logs when an
+error occurs.
+
+	// Add a task with custom error handling
+	id, err := scheduler.Add(&tasks.Task{
+		Interval: time.Duration(30 * time.Second),
+		TaskFunc: func() error {
+			// Put your logic here
+		}(),
+		ErrFunc: func(e error) {
+			log.Printf("An error occured when executing task %s - %s", id, e)
 		}(),
 	})
 	if err != nil {
@@ -85,6 +112,10 @@ type Task struct {
 	// the interval specified until deleted. With RunOnce enabled the first execution of the task will result in
 	// the task self deleting.
 	RunOnce bool
+
+	// StartAfter is used to specify a start time for the scheduler. When set, tasks will wait for the specified
+	// time to start the schedule ticker.
+	StartAfter time.Time
 
 	// TaskFunc is the user defined function to execute as part of this task.
 	TaskFunc func() error
@@ -147,7 +178,6 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 	if t.Interval <= time.Duration(0) {
 		return "", fmt.Errorf("task interval must be defined")
 	}
-	t.ticker = time.NewTicker(t.Interval)
 
 	// Create Context used to cancel downstream Goroutines
 	t.ctx, t.cancel = context.WithCancel(context.Background())
@@ -163,9 +193,11 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 		}
 		t.id = id.String()
 		schd.tasks[t.id] = t
-		go schd.execTask(t)
-		return t.id, nil
+		break
 	}
+
+	go schd.scheduleTask(t)
+	return t.id, nil
 }
 
 // Del will unschedule the specified task and remove it from the task list. Deletion will prevent future invocations of
@@ -179,7 +211,9 @@ func (schd *Scheduler) Del(name string) {
 
 	// Stop the task
 	defer t.cancel()
-	defer t.ticker.Stop()
+	if t.ticker != nil {
+		defer t.ticker.Stop()
+	}
 
 	// Remove from task list
 	schd.Lock()
@@ -219,6 +253,19 @@ func (schd *Scheduler) Stop() {
 	tt := schd.Tasks()
 	for n := range tt {
 		schd.Del(n)
+	}
+}
+
+// scheduleTask creates the underlying scheduled task. If StartAfter is set, this routine will wait until the
+// time specified.
+func (schd *Scheduler) scheduleTask(t *Task) {
+	select {
+	case <-time.After(time.Until(t.StartAfter)):
+		t.ticker = time.NewTicker(t.Interval)
+		go schd.execTask(t)
+		return
+	case <-t.ctx.Done():
+		return
 	}
 }
 

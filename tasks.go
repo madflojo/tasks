@@ -221,7 +221,6 @@ func (schd *Scheduler) Del(name string) {
 	if _, ok := schd.tasks[name]; ok {
 		delete(schd.tasks, name)
 	}
-	return
 }
 
 // Lookup will find the specified task from the internal task list using the task ID provided.

@@ -15,7 +15,7 @@ func TestAdd(t *testing.T) {
 		id, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -39,7 +39,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil callback", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -49,7 +49,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil interval", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -72,7 +72,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -105,7 +105,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -135,7 +135,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -174,7 +174,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)

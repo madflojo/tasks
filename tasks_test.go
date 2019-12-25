@@ -124,6 +124,40 @@ func TestScheduler(t *testing.T) {
 		}
 	})
 
+	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{})
+
+		// Create a Start time
+		sa := time.Now().Add(10 * time.Second)
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:   time.Duration(1 * time.Second),
+			StartAfter: sa,
+			TaskFunc: func() error {
+				doneCh <- struct{}{}
+				return nil
+			},
+			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		// Remove task before it can be scheduled
+		scheduler.Del(id)
+
+		// Make sure it doesn't run
+		select {
+		case <-doneCh:
+			t.Errorf("Task executed it was supposed to be cancelled")
+			return
+		case <-time.After(15 * time.Second):
+			return
+		}
+	})
+
 	t.Run("Verify Tasks Dont run when Deleted", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
 		doneCh := make(chan struct{})

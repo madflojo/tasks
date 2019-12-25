@@ -5,8 +5,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/madflojo/tasks)](https://goreportcard.com/report/github.com/madflojo/tasks) 
 [![Documentation](https://godoc.org/github.com/madflojo/tasks?status.svg)](http://godoc.org/github.com/madflojo/tasks)
 
-Package tasks is an easy to use in-process task scheduler for Go. Focused on interval based execution, Tasks provides 
-both recurring and one-time task scheduling.
+Package tasks is an easy to use in-process scheduler for recurring tasks in Go. Tasks is focused on high frequency
+tasks that run quick, and often. The goal of Tasks is to support concurrent running tasks at scale without scheduler
+induced jitter.
 
 Tasks is focused on accuracy of task execution. To do this each task is called within it's own goroutine. This ensures 
 that long execution of a single invocation does not throw the schedule as a whole off track.
@@ -89,3 +90,4 @@ if err != nil {
   // Do Stuff
 }
 ```
+

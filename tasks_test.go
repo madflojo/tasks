@@ -15,7 +15,7 @@ func TestAdd(t *testing.T) {
 		id, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -39,7 +39,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil callback", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -49,7 +49,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil interval", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) { return },
+			ErrFunc:  func(e error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -72,7 +72,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -90,6 +90,40 @@ func TestScheduler(t *testing.T) {
 		}
 	})
 
+	t.Run("Verify StartAfter works as expected", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{})
+
+		// Create a Start time
+		sa := time.Now().Add(10 * time.Second)
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:   time.Duration(1 * time.Second),
+			StartAfter: sa,
+			TaskFunc: func() error {
+				doneCh <- struct{}{}
+				return nil
+			},
+			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+		defer scheduler.Del(id)
+
+		// Make sure it runs especially when we want it too
+		select {
+		case <-doneCh:
+			if time.Now().Before(sa) {
+				t.Errorf("Task executed before the defined start time now %s, supposed to be %s", time.Now().String(), sa.String())
+			}
+			return
+		case <-time.After(15 * time.Second):
+			t.Errorf("Scheduler failed to execute the scheduled tasks within 15 seconds")
+		}
+	})
+
 	t.Run("Verify Tasks Dont run when Deleted", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
 		doneCh := make(chan struct{})
@@ -101,7 +135,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -140,7 +174,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) { return },
+			ErrFunc: func(e error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)

@@ -117,7 +117,7 @@ type Task struct {
 	RunOnce bool
 
 	// StartAfter is used to specify a start time for the scheduler. When set, tasks will wait for the specified
-	// time to start the schedule ticker.
+	// time to start the schedule timer.
 	StartAfter time.Time
 
 	// TaskFunc is the user defined function to execute as part of this task.
@@ -127,8 +127,8 @@ type Task struct {
 	// errors from tasks will be ignored.
 	ErrFunc func(error)
 
-	// ticker is the internal task timer. This is stored here to provide control via main scheduler functions.
-	ticker *time.Ticker
+	// timer is the internal task timer. This is stored here to provide control via main scheduler functions.
+	timer *time.Timer
 
 	// ctx is the internal context used to control task cancelation.
 	ctx context.Context
@@ -177,7 +177,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 		return "", fmt.Errorf("task function cannot be nil")
 	}
 
-	// Ensure Interval is never 0, this would cause Ticker to panic
+	// Ensure Interval is never 0, this would cause Timer to panic
 	if t.Interval <= time.Duration(0) {
 		return "", fmt.Errorf("task interval must be defined")
 	}
@@ -214,8 +214,8 @@ func (schd *Scheduler) Del(name string) {
 
 	// Stop the task
 	defer t.cancel()
-	if t.ticker != nil {
-		defer t.ticker.Stop()
+	if t.timer != nil {
+		defer t.timer.Stop()
 	}
 
 	// Remove from task list
@@ -261,8 +261,7 @@ func (schd *Scheduler) Stop() {
 func (schd *Scheduler) scheduleTask(t *Task) {
 	select {
 	case <-time.After(time.Until(t.StartAfter)):
-		t.ticker = time.NewTicker(t.Interval)
-		go schd.execTask(t)
+		t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
 		return
 	case <-t.ctx.Done():
 		return
@@ -271,22 +270,16 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.
 func (schd *Scheduler) execTask(t *Task) {
-	for {
-		select {
-		case <-t.ticker.C:
-			go func() {
-				err := t.TaskFunc()
-				if err != nil && t.ErrFunc != nil {
-					go t.ErrFunc(err)
-				}
-				// If RunOnce is true, kill this task after one execution
-				if t.RunOnce {
-					defer schd.Del(t.id)
-					return
-				}
-			}()
-		case <-t.ctx.Done():
-			return
+	go func() {
+		err := t.TaskFunc()
+		if err != nil && t.ErrFunc != nil {
+			go t.ErrFunc(err)
 		}
+		if t.RunOnce {
+			defer schd.Del(t.id)
+		}
+	}()
+	if !t.RunOnce {
+		t.timer.Reset(t.Interval)
 	}
 }

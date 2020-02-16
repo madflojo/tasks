@@ -27,9 +27,6 @@ func TestAdd(t *testing.T) {
 		}
 
 		tt := scheduler.Tasks()
-		if err != nil {
-			t.Errorf("Unable to find scheduled tasks - %s", err)
-		}
 		if len(tt) < 1 {
 			t.Errorf("Unable to find newly scheduled task with Tasks")
 		}

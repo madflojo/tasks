@@ -83,7 +83,7 @@ id, err := scheduler.Add(&tasks.Task{
     // Put your logic here
   }(),
   ErrFunc: func(e error) {
-    log.Printf("An error occured when executing task %s - %s", id, e)
+    log.Printf("An error occurred when executing task %s - %s", id, e)
   }(),
 })
 if err != nil {

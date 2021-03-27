@@ -120,6 +120,11 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("Scheduler failed to execute the scheduled tasks within 15 seconds")
 		}
 	})
+}
+
+func TestSchedulerDoesntRun(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
 
 	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -192,6 +197,11 @@ func TestScheduler(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestSchedulerExtras(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
 
 	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran

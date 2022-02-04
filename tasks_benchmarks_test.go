@@ -16,6 +16,9 @@ func BenchmarkTasks(b *testing.B) {
 		TaskFunc: func() error { return nil },
 		ErrFunc:  func(e error) {},
 	})
+	if err != nil {
+		b.Fatalf("Unable to schedule example task - %s", err)
+	}
 	defer scheduler.Del(taskID)
 
 	// Grab example for re-use

@@ -1,9 +1,8 @@
 # Tasks
 
-[![Build Status](https://travis-ci.org/madflojo/tasks.svg?branch=master)](https://travis-ci.org/madflojo/tasks) 
 [![Coverage Status](https://coveralls.io/repos/github/madflojo/tasks/badge.svg?branch=master)](https://coveralls.io/github/madflojo/tasks?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/madflojo/tasks)](https://goreportcard.com/report/github.com/madflojo/tasks) 
-[![Documentation](https://godoc.org/github.com/madflojo/tasks?status.svg)](http://godoc.org/github.com/madflojo/tasks)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/madflojo/tasks)](https://pkg.go.dev/github.com/madflojo/tasks)
 
 Package tasks is an easy to use in-process scheduler for recurring tasks in Go. Tasks is focused on high frequency
 tasks that run quick, and often. The goal of Tasks is to support concurrent running tasks at scale without scheduler

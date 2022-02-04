@@ -208,7 +208,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 // Once added, tasks will wait the defined time interval and then execute. This means a task with a 15 second interval
 // will be triggered 15 seconds after Add is complete. Not before or after (excluding typical machine time jitter).
 //
-//  // Add a task
+//  	// Add a task
 //	id := xid.New()
 //  	err := scheduler.Add(id, &tasks.Task{
 //  	Interval: time.Duration(30 * time.Second),

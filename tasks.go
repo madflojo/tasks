@@ -210,7 +210,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //
 //  // Add a task
 //	id := xid.New()
-//  err := scheduler.Add(id, &tasks.Task{
+//  	err := scheduler.Add(id, &tasks.Task{
 //  	Interval: time.Duration(30 * time.Second),
 //  	TaskFunc: func() error {
 //  		// Put your logic here

@@ -47,7 +47,7 @@ jobs:
         go-version: 1.16
 
     - name: Install Tickeryzer
-      run: go install github.com/orijtech/tickeryzer/cmd/tickeryzer
+      run: go get -u github.com/orijtech/tickeryzer/cmd/tickeryzer
 
     - name: Run Tickeryzer
       run: tickeryzer ./...

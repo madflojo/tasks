@@ -1,5 +1,5 @@
 module github.com/madflojo/tasks
 
-go 1.13
+go 1.17
 
-require github.com/rs/xid v1.2.1
+require github.com/rs/xid v1.3.0

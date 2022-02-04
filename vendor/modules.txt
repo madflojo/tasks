@@ -1,2 +1,0 @@
-# github.com/rs/xid v1.2.1
-github.com/rs/xid

@@ -181,7 +181,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 	id := xid.New()
 	err := schd.AddWithID(id.String(), t)
 	if err == ErrIDInUse {
-		schd.Add(t)
+		return schd.Add(t)
 	}
 	return id.String(), err
 }

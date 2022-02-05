@@ -178,15 +178,10 @@ func New() *Scheduler {
 //  }
 //
 func (schd *Scheduler) Add(t *Task) (string, error) {
-  var err error
 	id := xid.New()
-	for {
-		err = schd.AddWithID(id.String(), t)
-		if err == ErrIDInUse {
-			id = xid.New()
-			continue
-		}
-		break
+	err := schd.AddWithID(id.String(), t)
+	if err == ErrIDInUse {
+		schd.Add(t)
 	}
 	return id.String(), err
 }
@@ -197,7 +192,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //
 //	// Add a task
 //	id := xid.New()
-//	err := scheduler.Add(id, &tasks.Task{
+//	err := scheduler.AddWithID(id, &tasks.Task{
 //		Interval: time.Duration(30 * time.Second),
 //		TaskFunc: func() error {
 //			// Put your logic here

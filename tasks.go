@@ -147,6 +147,11 @@ type Scheduler struct {
 	tasks map[string]*Task
 }
 
+var (
+	// ErrIDInUse is returned when a Task ID is specified but already used.
+	ErrIDInUse = fmt.Errorf("ID already used")
+)
+
 // New will create a new scheduler instance that allows users to create and manage tasks.
 func New() *Scheduler {
 	s := &Scheduler{}
@@ -173,55 +178,32 @@ func New() *Scheduler {
 //  }
 //
 func (schd *Scheduler) Add(t *Task) (string, error) {
-	// Check if TaskFunc is nil before doing anything
-	if t.TaskFunc == nil {
-		return "", fmt.Errorf("task function cannot be nil")
-	}
-
-	// Ensure Interval is never 0, this would cause Timer to panic
-	if t.Interval <= time.Duration(0) {
-		return "", fmt.Errorf("task interval must be defined")
-	}
-
-	// Create Context used to cancel downstream Goroutines
-	t.ctx, t.cancel = context.WithCancel(context.Background())
-
-	// Create ID, add to task list and start background task
 	id := xid.New()
-	schd.Lock()
-	defer schd.Unlock()
-	for {
-		if _, ok := schd.tasks[id.String()]; ok {
-			id = xid.New()
-			continue
-		}
-		t.id = id.String()
-		schd.tasks[t.id] = t
-		break
+	err := schd.AddWithID(id.String(), t)
+	if err == ErrIDInUse {
+		return schd.Add(t)
 	}
-
-	go schd.scheduleTask(t)
-	return t.id, nil
+	return id.String(), err
 }
 
 // AddWithID will add a task with an ID to the task list and schedule it. It will return an error if the ID is in-use.
 // Once added, tasks will wait the defined time interval and then execute. This means a task with a 15 second interval
 // will be triggered 15 seconds after Add is complete. Not before or after (excluding typical machine time jitter).
 //
-//  	// Add a task
+//	// Add a task
 //	id := xid.New()
-//  	err := scheduler.Add(id, &tasks.Task{
-//  	Interval: time.Duration(30 * time.Second),
-//  	TaskFunc: func() error {
-//  		// Put your logic here
-//  	}(),
-//  	ErrFunc: func(err error) {
-//  		// Put custom error handling here
-//  	}(),
-//  })
-//  if err != nil {
-//  	// Do stuff
-//  }
+//	err := scheduler.AddWithID(id, &tasks.Task{
+//		Interval: time.Duration(30 * time.Second),
+//		TaskFunc: func() error {
+//			// Put your logic here
+//		}(),
+//		ErrFunc: func(err error) {
+//			// Put custom error handling here
+//		}(),
+//	})
+//	if err != nil {
+//		// Do stuff
+//	}
 //
 func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	// Check if TaskFunc is nil before doing anything
@@ -241,7 +223,7 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	schd.Lock()
 	defer schd.Unlock()
 	if _, ok := schd.tasks[id]; ok {
-		return fmt.Errorf("id %s is already in use", id)
+		return ErrIDInUse
 	}
 	t.id = id
 	schd.tasks[t.id] = t

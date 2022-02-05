@@ -80,8 +80,7 @@ func TestAdd(t *testing.T) {
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(e error) {},
 		})
-		expectedError := fmt.Errorf("id %s is already in use", id)
-		if err.Error() != expectedError.Error() {
+		if err != ErrIDInUse {
 			t.Errorf("Expected error for task with existing id")
 		}
 

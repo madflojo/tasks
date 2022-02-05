@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/rs/xid"
 )
 
 func TestAdd(t *testing.T) {
@@ -31,6 +33,62 @@ func TestAdd(t *testing.T) {
 			t.Errorf("Unable to find newly scheduled task with Tasks")
 		}
 
+	})
+
+	t.Run("Add a valid task with an id and look it up", func(t *testing.T) {
+		id := xid.New()
+		err := scheduler.AddWithID(id.String(), &Task{
+			Interval: time.Duration(1 * time.Minute),
+			TaskFunc: func() error { return nil },
+			ErrFunc:  func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		_, err = scheduler.Lookup(id.String())
+		if err != nil {
+			t.Errorf("Unable to find newly scheduled task with Lookup - %s", err)
+		}
+
+		tt := scheduler.Tasks()
+		if len(tt) < 1 {
+			t.Errorf("Unable to find newly scheduled task with Tasks")
+		}
+
+	})
+
+	t.Run("Add a invalid task with an duplicate id and look it up", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{})
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval: time.Duration(1 * time.Second),
+			TaskFunc: func() error {
+				doneCh <- struct{}{}
+				return nil
+			},
+			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		err = scheduler.AddWithID(id, &Task{
+			Interval: time.Duration(1 * time.Minute),
+			TaskFunc: func() error { return nil },
+			ErrFunc:  func(e error) {},
+		})
+		expectedError := fmt.Errorf("id %s is already in use", id)
+		if err.Error() != expectedError.Error() {
+			t.Errorf("Expected error for task with existing id")
+		}
+
+		_, err = scheduler.Lookup(id)
+		if err != nil {
+			t.Errorf("Unable to find previously scheduled task with Lookup - %s", err)
+		}
 	})
 
 	t.Run("Check for nil callback", func(t *testing.T) {

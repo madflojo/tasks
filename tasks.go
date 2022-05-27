@@ -238,7 +238,11 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	t.id = id
 	schd.tasks[t.id] = t
 
-	go schd.scheduleTask(t)
+	if time.Until(t.StartAfter) > time.Duration(0) {
+		go schd.scheduleTask(t)
+		return nil
+	}
+	schd.scheduleTask(t)
 	return nil
 }
 

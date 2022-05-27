@@ -238,6 +238,10 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	t.id = id
 	schd.tasks[t.id] = t
 
+	if t.StartAfter.IsZero() {
+		schd.scheduleTask(t)
+		return nil
+	}
 	go schd.scheduleTask(t)
 	return nil
 }

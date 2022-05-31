@@ -292,7 +292,11 @@ func (schd *Scheduler) Lookup(name string) (*Task, error) {
 func (schd *Scheduler) Tasks() map[string]*Task {
 	schd.RLock()
 	defer schd.RUnlock()
-	return schd.tasks
+	m := make(map[string]*Task)
+	for k, v := range schd.tasks {
+		m[k] = v
+	}
+	return m
 }
 
 // Stop is used to unschedule and delete all tasks owned by the scheduler instance.

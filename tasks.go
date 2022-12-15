@@ -29,7 +29,6 @@ Below is an example of starting the scheduler and registering a new task that ru
 		// Do Stuff
 	}
 
-
 Sometimes schedules need to started at a later time. This package provides the ability to start a task only after
 a certain time. The below example shows this in practice.
 
@@ -77,7 +76,6 @@ error occurs.
 	if err != nil {
 		// Do Stuff
 	}
-
 */
 package tasks
 
@@ -128,7 +126,7 @@ type Task struct {
 
 	// ErrFunc allows users to define a function that is called when tasks return an error. If ErrFunc is nil,
 	// errors from tasks will be ignored.
-	ErrFunc func(error)
+	ErrFunc func(string, error)
 
 	// timer is the internal task timer. This is stored here to provide control via main scheduler functions.
 	timer *time.Timer
@@ -157,10 +155,8 @@ type Scheduler struct {
 	tasks map[string]*Task
 }
 
-var (
-	// ErrIDInUse is returned when a Task ID is specified but already used.
-	ErrIDInUse = fmt.Errorf("ID already used")
-)
+// ErrIDInUse is returned when a Task ID is specified but already used.
+var ErrIDInUse = fmt.Errorf("ID already used")
 
 // New will create a new scheduler instance that allows users to create and manage tasks.
 func New() *Scheduler {
@@ -173,20 +169,19 @@ func New() *Scheduler {
 // execute. This means a task with a 15 second interval will be triggered 15 seconds after Add is complete. Not before
 // or after (excluding typical machine time jitter).
 //
-//  // Add a task
-//  id, err := scheduler.Add(&tasks.Task{
-//  	Interval: time.Duration(30 * time.Second),
-//  	TaskFunc: func() error {
-//  		// Put your logic here
-//  	}(),
-//  	ErrFunc: func(err error) {
-//  		// Put custom error handling here
-//  	}(),
-//  })
-//  if err != nil {
-//  	// Do stuff
-//  }
-//
+//	// Add a task
+//	id, err := scheduler.Add(&tasks.Task{
+//		Interval: time.Duration(30 * time.Second),
+//		TaskFunc: func() error {
+//			// Put your logic here
+//		}(),
+//		ErrFunc: func(err error) {
+//			// Put custom error handling here
+//		}(),
+//	})
+//	if err != nil {
+//		// Do stuff
+//	}
 func (schd *Scheduler) Add(t *Task) (string, error) {
 	id := xid.New()
 	err := schd.AddWithID(id.String(), t)
@@ -214,7 +209,6 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //	if err != nil {
 //		// Do stuff
 //	}
-//
 func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	// Check if TaskFunc is nil before doing anything
 	if t.TaskFunc == nil {
@@ -326,7 +320,7 @@ func (schd *Scheduler) execTask(t *Task) {
 	go func() {
 		err := t.TaskFunc()
 		if err != nil && t.ErrFunc != nil {
-			go t.ErrFunc(err)
+			go t.ErrFunc(t.id, err)
 		}
 		if t.RunOnce {
 			defer schd.Del(t.id)

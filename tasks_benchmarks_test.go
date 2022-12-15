@@ -14,7 +14,7 @@ func BenchmarkTasks(b *testing.B) {
 	taskID, err := scheduler.Add(&Task{
 		Interval: time.Duration(1 * time.Minute),
 		TaskFunc: func() error { return nil },
-		ErrFunc:  func(e error) {},
+		ErrFunc:  func(_ string, e error) {},
 	})
 	if err != nil {
 		b.Fatalf("Unable to schedule example task - %s", err)

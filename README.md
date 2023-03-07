@@ -26,10 +26,10 @@ defer scheduler.Stop()
 
 // Add a task
 id, err := scheduler.Add(&tasks.Task{
-  Interval: time.Duration(30 * time.Second),
+  Interval: 30 * time.Second,
   TaskFunc: func() error {
     // Put your logic here
-  }(),
+  },
 })
 if err != nil {
   // Do Stuff
@@ -42,11 +42,11 @@ certain time. The below example shows this in practice.
 ```go
 // Add a recurring task for every 30 days, starting 30 days from now
 id, err := scheduler.Add(&tasks.Task{
-  Interval: time.Duration(30 * (24 * time.Hour)),
+  Interval: 30 * (24 * time.Hour),
   StartAfter: time.Now().Add(30 * (24 * time.Hour)),
   TaskFunc: func() error {
     // Put your logic here
-  }(),
+  },
 })
 if err != nil {
   // Do Stuff
@@ -59,11 +59,11 @@ after waiting for 60 seconds.
 ```go
 // Add a one time only task for 60 seconds from now
 id, err := scheduler.Add(&tasks.Task{
-  Interval: time.Duration(60 * time.Second)
+  Interval: 60 * time.Second,
   RunOnce:  true,
   TaskFunc: func() error {
     // Put your logic here
-  }(),
+  },
 })
 if err != nil {
   // Do Stuff
@@ -77,13 +77,13 @@ when an error occurs.
 ```go
 // Add a task with custom error handling
 id, err := scheduler.Add(&tasks.Task{
-  Interval: time.Duration(30 * time.Second),
+  Interval: 30 * time.Second,
   TaskFunc: func() error {
     // Put your logic here
-  }(),
+  },
   ErrFunc: func(e error) {
     log.Printf("An error occurred when executing task %s - %s", id, e)
-  }(),
+  },
 })
 if err != nil {
   // Do Stuff

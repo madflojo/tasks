@@ -9,6 +9,175 @@ import (
 	"github.com/rs/xid"
 )
 
+type InterfaceTestCase struct {
+	name   string
+	task   *Task
+	id     string
+	addErr bool
+}
+
+func TestTasksInterface(t *testing.T) {
+	var tt []InterfaceTestCase
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Basic Valid Task",
+		task: &Task{
+			Interval: time.Duration(1 * time.Second),
+			TaskFunc: func() error { return nil },
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Basic Valid Task with ID",
+		task: &Task{
+			Interval: time.Duration(1 * time.Second),
+			TaskFunc: func() error { return nil },
+		},
+		id: xid.New().String(),
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with ErrFunc",
+		task: &Task{
+			Interval: time.Duration(1 * time.Second),
+			TaskFunc: func() error { return nil },
+			ErrFunc:  func(e error) {},
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with Context",
+		task: &Task{
+			Interval:    time.Duration(1 * time.Second),
+			TaskFunc:    func() error { return nil },
+			ErrFunc:     func(e error) {},
+			TaskContext: TaskContext{Context: context.Background()},
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with Context and WithContextFuncs",
+		task: &Task{
+			Interval:               time.Duration(1 * time.Second),
+			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
+			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+			TaskContext:            TaskContext{Context: context.Background()},
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task without Context but WithContextFuncs",
+		task: &Task{
+			Interval:               time.Duration(1 * time.Second),
+			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
+			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with StartAfter",
+		task: &Task{
+			Interval:   time.Duration(1 * time.Second),
+			TaskFunc:   func() error { return nil },
+			StartAfter: time.Now().Add(time.Duration(1 * time.Second)),
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with StartAfter but in the past",
+		task: &Task{
+			Interval:   time.Duration(1 * time.Second),
+			TaskFunc:   func() error { return nil },
+			StartAfter: time.Now().Add(time.Duration(-1 * time.Minute)),
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "Valid Task with RunOnce",
+		task: &Task{
+			Interval: time.Duration(1 * time.Second),
+			TaskFunc: func() error { return nil },
+			RunOnce:  true,
+		},
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "No Interval",
+		task: &Task{
+			TaskFunc: func() error { return nil },
+		},
+		addErr: true,
+	})
+
+	tt = append(tt, InterfaceTestCase{
+		name: "No TaskFunc or FuncWithTaskContext",
+		task: &Task{
+			Interval: time.Duration(1 * time.Second),
+		},
+		addErr: true,
+	})
+
+	// Create a base scheduler to use
+	scheduler := New()
+	defer scheduler.Stop()
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			var err error
+			id := tc.id
+
+			// Schedule the task
+			if tc.id != "" {
+				err = scheduler.AddWithID(tc.id, tc.task)
+			} else {
+				id, err = scheduler.Add(tc.task)
+			}
+			if err != nil && !tc.addErr {
+				t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+			}
+			if err == nil && tc.addErr {
+				t.Errorf("Expected errors when scheduling an invalid task")
+			}
+			defer scheduler.Del(id)
+
+			if tc.id != "" {
+				t.Run(tc.name+" - Duplicate Task", func(t *testing.T) {
+					// Schedule the task
+					err := scheduler.AddWithID(tc.id, tc.task)
+					if err != ErrIDInUse {
+						t.Errorf("Expected errors when scheduling a duplicate task")
+					}
+				})
+			}
+
+			t.Run(tc.name+" - Lookup", func(t *testing.T) {
+				// Verify if task exists
+				_, err = scheduler.Lookup(id)
+				if err != nil && !tc.addErr {
+					t.Errorf("Unable to find newly scheduled task with Lookup - %s", err)
+				}
+				if err == nil && tc.addErr {
+					t.Errorf("Found task that should not exist - %s", id)
+				}
+			})
+
+			t.Run(tc.name+" - Task List", func(t *testing.T) {
+				// Check Task Map
+				tasks := scheduler.Tasks()
+				if len(tasks) != 1 && !tc.addErr {
+					t.Errorf("Unable to find newly scheduled task with Tasks")
+				}
+				if len(tasks) > 0 && tc.addErr {
+					t.Errorf("Found task that should not exist - %s", id)
+				}
+			})
+
+			// Reset for the next test
+			scheduler.Del(id)
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()

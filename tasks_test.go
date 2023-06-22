@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -127,6 +128,43 @@ func TestScheduler(t *testing.T) {
 				return nil
 			},
 			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+		defer scheduler.Del(id)
+
+		// Make sure it runs especially when we want it too
+		for i := 0; i < 6; i++ {
+			select {
+			case <-doneCh:
+				continue
+			case <-time.After(2 * time.Second):
+				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+			}
+		}
+	})
+
+	t.Run("Verify TasksWithContext Run when Added", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{})
+
+		// User-defined context
+		ctx, cancel := context.WithCancel(context.Background())
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:    time.Duration(1 * time.Second),
+			TaskContext: TaskContext{Context: ctx},
+			FuncWithTaskContext: func(_ TaskContext) error {
+				cancel()
+				return fmt.Errorf("Fake Error")
+			},
+			ErrFuncWithTaskContext: func(ctx TaskContext, e error) {
+				if ctx.Context.Err() == context.Canceled {
+					doneCh <- struct{}{}
+				}
+			},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)

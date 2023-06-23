@@ -308,9 +308,9 @@ func (schd *Scheduler) Lookup(name string) (*Task, error) {
 	defer schd.RUnlock()
 	t, ok := schd.tasks[name]
 	if ok {
-		return t, nil
+		return t.Clone(), nil
 	}
-	return t.Clone(), fmt.Errorf("could not find task within the task list")
+	return t, fmt.Errorf("could not find task within the task list")
 }
 
 // Tasks is used to return a copy of the internal tasks map.

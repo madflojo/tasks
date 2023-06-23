@@ -334,7 +334,13 @@ func (schd *Scheduler) Stop() {
 // time specified.
 func (schd *Scheduler) scheduleTask(t *Task) {
 	_ = time.AfterFunc(time.Until(t.StartAfter), func() {
-		if t.ctx.Err() != nil {
+		var err error
+
+		// Verify if task has been cancelled before scheduling
+		t.safeOps(func() {
+			err = t.ctx.Err()
+		})
+		if err != nil {
 			// Task has been cancelled, do not schedule
 			return
 		}

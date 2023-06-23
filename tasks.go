@@ -263,9 +263,14 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 		return ErrIDInUse
 	}
 	t.id = id
-	schd.tasks[t.id] = t
 
-	schd.scheduleTask(t)
+	// To make up for bad design decisions we need to copy the task for execution
+	task := t.Clone()
+
+	// Add task to schedule
+	schd.tasks[t.id] = task
+	schd.scheduleTask(task)
+
 	return nil
 }
 
@@ -383,4 +388,25 @@ func (schd *Scheduler) execTask(t *Task) {
 // If the task was added with AddWithID, this will be the same as the ID provided.
 func (ctx TaskContext) ID() string {
 	return ctx.id
+}
+
+// Clone will create a copy of the existing task. This is useful for creating a new task with the same properties as
+// an existing task. It is also used internally when creating a new task.
+func (t *Task) Clone() *Task {
+	task := &Task{}
+	t.safeOps(func() {
+		task.TaskFunc = t.TaskFunc
+		task.FuncWithTaskContext = t.FuncWithTaskContext
+		task.ErrFunc = t.ErrFunc
+		task.ErrFuncWithTaskContext = t.ErrFuncWithTaskContext
+		task.Interval = t.Interval
+		task.StartAfter = t.StartAfter
+		task.RunOnce = t.RunOnce
+		task.id = t.id
+		task.ctx = t.ctx
+		task.cancel = t.cancel
+		task.timer = t.timer
+		task.TaskContext = t.TaskContext
+	})
+	return task
 }

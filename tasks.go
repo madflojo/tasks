@@ -337,15 +337,17 @@ func (schd *Scheduler) Stop() {
 // scheduleTask creates the underlying scheduled task. If StartAfter is set, this routine will wait until the
 // time specified.
 func (schd *Scheduler) scheduleTask(t *Task) {
-	select {
-	case <-time.After(time.Until(t.StartAfter)):
+	_ = time.AfterFunc(time.Until(t.StartAfter), func() {
+		if t.ctx.Err() != nil {
+			// Task has been cancelled, do not schedule
+			return
+		}
+
+		// Schedule task
 		t.safeOps(func() {
 			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
 		})
-		return
-	case <-t.ctx.Done():
-		return
-	}
+	})
 }
 
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.

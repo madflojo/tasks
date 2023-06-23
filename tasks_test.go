@@ -17,11 +17,12 @@ type InterfaceTestCase struct {
 }
 
 type ExecutionTestCase struct {
-	name         string
-	ctx          context.Context
-	cancel       context.CancelFunc
-	task         *Task
-	callsFunc    bool
+	name      string
+	id        string
+	ctx       context.Context
+	cancel    context.CancelFunc
+	task      *Task
+	callsFunc bool
 }
 
 func TestTasksInterface(t *testing.T) {
@@ -292,9 +293,36 @@ func TestTaskExecution(t *testing.T) {
 	}
 	tt = append(tt, tc5)
 
+	// Validate TaskContext ID
+	tc6 := ExecutionTestCase{
+		name:      "Validate TaskContext ID",
+		callsFunc: true,
+		id:        "test-id",
+	}
+	tc6.ctx, tc6.cancel = context.WithCancel(context.Background())
+	tc6.task = &Task{
+		Interval:    time.Duration(1 * time.Second),
+		TaskContext: TaskContext{Context: tc6.ctx},
+		FuncWithTaskContext: func(taskCtx TaskContext) error {
+			if taskCtx.ID() != tc6.id {
+				t.Errorf("TaskContext.ID does not match expected ID")
+			}
+			tc6.cancel()
+			return nil
+		},
+	}
+	tt = append(tt, tc6)
+
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			id, err := scheduler.Add(tc.task)
+			var err error
+			id := tc.id
+
+			if tc.id != "" {
+				err = scheduler.AddWithID(tc.id, tc.task)
+			} else {
+				id, err = scheduler.Add(tc.task)
+			}
 			if err != nil {
 				t.Errorf("Unexpected errors when scheduling a task - %s", err)
 			}

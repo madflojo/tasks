@@ -313,6 +313,28 @@ func TestTaskExecution(t *testing.T) {
 	}
 	tt = append(tt, tc6)
 
+	// Verify that StartAfter time is respected
+	tc7 := ExecutionTestCase{
+		name:      "Verify StartAfter time is respected",
+		callsFunc: true,
+	}
+	tc7StartAfter := time.Now().Add(time.Duration(5 * time.Second))
+	tc7.ctx, tc7.cancel = context.WithCancel(context.Background())
+	tc7.task = &Task{
+		Interval:    time.Duration(1 * time.Second),
+		StartAfter:  tc7StartAfter,
+		TaskContext: TaskContext{Context: tc7.ctx},
+		FuncWithTaskContext: func(taskCtx TaskContext) error {
+			if time.Now().Before(tc7StartAfter) {
+				t.Errorf("Task should not have been called before StartAfter time")
+				return nil
+			}
+			tc7.cancel()
+			return nil
+		},
+	}
+	tt = append(tt, tc7)
+
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			var err error

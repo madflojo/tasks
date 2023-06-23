@@ -21,9 +21,7 @@ type ExecutionTestCase struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
 	task         *Task
-	id           string
 	callsFunc    bool
-	callsErrFunc bool
 }
 
 func TestTasksInterface(t *testing.T) {

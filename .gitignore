@@ -13,3 +13,6 @@
 
 # Coverage files
 coverage.html
+
+# vim swp files
+*.swp

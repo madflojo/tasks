@@ -16,6 +16,16 @@ type InterfaceTestCase struct {
 	addErr bool
 }
 
+type ExecutionTestCase struct {
+	name         string
+	ctx          context.Context
+	cancel       context.CancelFunc
+	task         *Task
+	id           string
+	callsFunc    bool
+	callsErrFunc bool
+}
+
 func TestTasksInterface(t *testing.T) {
 	var tt []InterfaceTestCase
 
@@ -178,6 +188,140 @@ func TestTasksInterface(t *testing.T) {
 	}
 }
 
+func TestTaskExecution(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
+	defer scheduler.Stop()
+
+	// Setup table tests
+	var tt []ExecutionTestCase
+
+	// Define a basic task
+	tc := ExecutionTestCase{
+		name:      "Valid Task",
+		callsFunc: true,
+	}
+	tc.ctx, tc.cancel = context.WithCancel(context.Background())
+	tc.task = &Task{
+		Interval: time.Duration(1 * time.Second),
+		TaskFunc: func() error { return fmt.Errorf("fake error") },
+		ErrFunc: func(e error) {
+			if e != nil {
+				tc.cancel()
+			}
+		},
+	}
+	tt = append(tt, tc)
+
+	// Define a task with TaskContext
+	tc2 := ExecutionTestCase{
+		name:      "Valid Task with TaskContext",
+		callsFunc: true,
+	}
+	tc2.ctx, tc2.cancel = context.WithCancel(context.Background())
+	tc2.task = &Task{
+		Interval:    time.Duration(1 * time.Second),
+		TaskContext: TaskContext{Context: tc2.ctx},
+		FuncWithTaskContext: func(taskCtx TaskContext) error {
+			if taskCtx.Context != tc2.ctx {
+				t.Logf("TaskContext.Context does not match expected context")
+				// return with no error to trigger a timeout failure
+				return nil
+			}
+			return fmt.Errorf("fake error")
+		},
+		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
+			if taskCtx == tc2.task.TaskContext && e != nil {
+				tc2.cancel()
+			}
+			if taskCtx.Context.Err() != context.Canceled {
+				t.Errorf("TaskContext.Context should be canceled")
+			}
+		},
+	}
+	tt = append(tt, tc2)
+
+	// Define a task then cancel it
+	tc3 := ExecutionTestCase{
+		name: "Cancel a Task before it's called",
+	}
+	tc3.ctx, tc3.cancel = context.WithCancel(context.Background())
+	tc3.task = &Task{
+		Interval:    time.Duration(1 * time.Second),
+		StartAfter:  time.Now().Add(time.Duration(5 * time.Second)),
+		TaskContext: TaskContext{Context: tc3.ctx},
+		TaskFunc: func() error {
+			tc.cancel()
+			return nil
+		},
+	}
+	tt = append(tt, tc3)
+
+	// Only call ErrFunc if error
+	tc4 := ExecutionTestCase{
+		name:      "Only call ErrFunc if error",
+		callsFunc: true,
+	}
+	tc4.ctx, tc4.cancel = context.WithCancel(context.Background())
+	tc4.task = &Task{
+		Interval: time.Duration(1 * time.Second),
+		TaskFunc: func() error {
+			tc4.cancel()
+			return nil
+		},
+		ErrFunc: func(e error) {
+			t.Errorf("ErrFunc should not be called")
+		},
+	}
+	tt = append(tt, tc4)
+
+	// Only call ErrFuncWithTaskContext if error
+	tc5 := ExecutionTestCase{
+		name:      "Only call ErrFuncWithTaskContext if error",
+		callsFunc: true,
+	}
+	tc5.ctx, tc5.cancel = context.WithCancel(context.Background())
+	tc5.task = &Task{
+		Interval:    time.Duration(1 * time.Second),
+		TaskContext: TaskContext{Context: tc5.ctx},
+		FuncWithTaskContext: func(taskCtx TaskContext) error {
+			tc5.cancel()
+			return nil
+		},
+		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
+			t.Errorf("ErrFuncWithTaskContext should not be called")
+		},
+	}
+	tt = append(tt, tc5)
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			id, err := scheduler.Add(tc.task)
+			if err != nil {
+				t.Errorf("Unexpected errors when scheduling a task - %s", err)
+			}
+
+			// Cancel the task if it's not supposed to be called
+			if !tc.callsFunc {
+				scheduler.Del(id)
+			}
+
+			select {
+			case <-tc.ctx.Done():
+				if tc.callsFunc {
+					return
+				}
+				t.Errorf("Task was executed when it should not have been")
+			case <-time.After(time.Duration(10 * time.Second)):
+				if !tc.callsFunc {
+					return
+				}
+				t.Errorf("Task did not execute within 10 seconds")
+			}
+		})
+	}
+}
+
 func TestAdd(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
@@ -330,7 +474,7 @@ func TestScheduler(t *testing.T) {
 				return fmt.Errorf("Fake Error")
 			},
 			ErrFuncWithTaskContext: func(ctx TaskContext, e error) {
-				if ctx.Context.Err() == context.Canceled {
+				if ctx.Context != nil && ctx.Context.Err() == context.Canceled {
 					doneCh <- struct{}{}
 				}
 			},

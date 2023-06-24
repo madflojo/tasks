@@ -308,7 +308,7 @@ func (schd *Scheduler) Lookup(name string) (*Task, error) {
 	defer schd.RUnlock()
 	t, ok := schd.tasks[name]
 	if ok {
-		return t, nil
+		return t.Clone(), nil
 	}
 	return t, fmt.Errorf("could not find task within the task list")
 }
@@ -322,7 +322,7 @@ func (schd *Scheduler) Tasks() map[string]*Task {
 	defer schd.RUnlock()
 	m := make(map[string]*Task)
 	for k, v := range schd.tasks {
-		m[k] = v
+		m[k] = v.Clone()
 	}
 	return m
 }

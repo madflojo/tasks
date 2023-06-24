@@ -8,4 +8,4 @@ Bugs, Proposals, & Feature Requests are all welcome. To get started, please open
 
 ## Contributing
 
-Contributions are always appreciated, please try to maintain usage contracts.
+Contributions are always appreciated, please try to maintain usage contracts. If you are unsure, please open an issue to discuss.

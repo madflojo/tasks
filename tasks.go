@@ -23,7 +23,7 @@ Below is an example of starting the scheduler and registering a new task that ru
 		Interval: time.Duration(30 * time.Second),
 		TaskFunc: func() error {
 			// Put your logic here
-		}(),
+		},
 	})
 	if err != nil {
 		// Do Stuff
@@ -38,7 +38,7 @@ a certain time. The below example shows this in practice.
 		StartAfter: time.Now().Add(30 * (24 * time.Hour)),
 		TaskFunc: func() error {
 			// Put your logic here
-		}(),
+		},
 	})
 	if err != nil {
 		// Do Stuff
@@ -53,7 +53,7 @@ waiting for 60 seconds.
 		RunOnce:  true,
 		TaskFunc: func() error {
 			// Put your logic here
-		}(),
+		},
 	})
 	if err != nil {
 		// Do Stuff
@@ -71,7 +71,7 @@ error occurs.
 		}(),
 		ErrFunc: func(e error) {
 			log.Printf("An error occurred when executing task %s - %s", id, e)
-		}(),
+		},
 	})
 	if err != nil {
 		// Do Stuff

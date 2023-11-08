@@ -124,6 +124,10 @@ type Task struct {
 	// time to start the schedule timer.
 	StartAfter time.Time
 
+	// Singleton is used to ensure that only one runs when enabled and the task is blocked.
+	Singleton bool
+	isRunning bool
+
 	// TaskFunc is the user defined function to execute as part of this task.
 	//
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
@@ -360,6 +364,15 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.
 func (schd *Scheduler) execTask(t *Task) {
 	go func() {
+		t.Lock()
+		if t.Singleton && t.isRunning {
+			t.Unlock()
+			return
+		}
+
+		t.isRunning = true
+		t.Unlock()
+
 		var err error
 		if t.FuncWithTaskContext != nil {
 			err = t.FuncWithTaskContext(t.TaskContext)
@@ -376,7 +389,14 @@ func (schd *Scheduler) execTask(t *Task) {
 		if t.RunOnce {
 			defer schd.Del(t.id)
 		}
+
+		t.safeOps(func() {
+			if t.isRunning {
+				t.isRunning = false
+			}
+		})
 	}()
+
 	if !t.RunOnce {
 		t.safeOps(func() {
 			t.timer.Reset(t.Interval)
@@ -401,6 +421,7 @@ func (t *Task) Clone() *Task {
 		task.ErrFuncWithTaskContext = t.ErrFuncWithTaskContext
 		task.Interval = t.Interval
 		task.StartAfter = t.StartAfter
+		task.Singleton = t.Singleton
 		task.RunOnce = t.RunOnce
 		task.id = t.id
 		task.ctx = t.ctx

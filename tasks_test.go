@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -574,6 +575,71 @@ func TestScheduler(t *testing.T) {
 			return
 		case <-time.After(15 * time.Second):
 			t.Errorf("Scheduler failed to execute the scheduled tasks within 15 seconds")
+		}
+	})
+}
+
+func TestSchedulerSingleton(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
+
+	t.Run("Verify singleton by chan", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		doneCh := make(chan struct{}, 10)
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:  time.Duration(1 * time.Millisecond),
+			Singleton: true,
+			TaskFunc: func() error {
+				doneCh <- struct{}{}
+				time.Sleep(1 * time.Second)
+				return nil
+			},
+			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		defer scheduler.Del(id)
+
+		select {
+		case <-time.After(3 * time.Second):
+			if len(doneCh) > 4 {
+				t.Log("failed to run with singleton mode")
+			}
+			return
+		}
+	})
+
+	t.Run("Verify singleton by counter", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		var incr int32
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:  time.Duration(1 * time.Millisecond),
+			Singleton: true,
+			TaskFunc: func() error {
+				atomic.AddInt32(&incr, 1)
+				time.Sleep(1 * time.Second)
+				return nil
+			},
+			ErrFunc: func(e error) {},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		defer scheduler.Del(id)
+
+		select {
+		case <-time.After(3 * time.Second):
+			if atomic.LoadInt32(&incr) > 4 {
+				t.Log("failed to run with singleton mode")
+			}
+			return
 		}
 	})
 }

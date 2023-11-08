@@ -604,12 +604,9 @@ func TestSchedulerSingleton(t *testing.T) {
 
 		defer scheduler.Del(id)
 
-		select {
-		case <-time.After(3 * time.Second):
-			if len(doneCh) > 4 {
-				t.Log("failed to run with singleton mode")
-			}
-			return
+		<-time.After(3 * time.Second)
+		if len(doneCh) > 4 {
+			t.Log("failed to run with singleton mode")
 		}
 	})
 
@@ -634,12 +631,62 @@ func TestSchedulerSingleton(t *testing.T) {
 
 		defer scheduler.Del(id)
 
-		select {
-		case <-time.After(3 * time.Second):
-			if atomic.LoadInt32(&incr) > 4 {
-				t.Log("failed to run with singleton mode")
+		<-time.After(3 * time.Second)
+		if atomic.LoadInt32(&incr) > 4 {
+			t.Log("failed to run with singleton mode")
+		}
+	})
+
+	t.Run("Verify singleton by errFunc", func(t *testing.T) {
+		// Channel for orchestrating when the task ran
+		var incr int32
+		var errchan = make(chan error, 1)
+
+		// Setup A task
+		id, err := scheduler.Add(&Task{
+			Interval:  time.Duration(100 * time.Millisecond),
+			Singleton: true,
+			TaskFunc: func() error {
+				fmt.Println("run")
+				atomic.AddInt32(&incr, 1)
+				time.Sleep(1 * time.Second)
+				return nil
+			},
+			ErrFunc: func(e error) {
+				fmt.Println("err")
+				errchan <- e
+			},
+		})
+		if err != nil {
+			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		defer scheduler.Del(id)
+
+		var (
+			timeout = time.After(3 * time.Second)
+			errIncr = 0
+		)
+
+		for {
+			select {
+			case err := <-errchan:
+				if err != ErrTaskRunning {
+					t.Error("the err must be ErrTaskRunning")
+				}
+				errIncr++
+
+			case <-timeout:
+				if atomic.LoadInt32(&incr) > 4 {
+					t.Error("failed to run with singleton mode")
+				}
+
+				if errIncr < 20 {
+					t.Error("failed to run with singleton mode")
+				}
+
+				return
 			}
-			return
 		}
 	})
 }

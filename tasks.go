@@ -81,6 +81,7 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -190,6 +191,9 @@ type Scheduler struct {
 var (
 	// ErrIDInUse is returned when a Task ID is specified but already used.
 	ErrIDInUse = fmt.Errorf("ID already used")
+
+	// ErrTaskRunning is returned when the previous task is running.
+	ErrTaskRunning = errors.New("the previous task is still running")
 )
 
 // New will create a new scheduler instance that allows users to create and manage tasks.
@@ -366,6 +370,12 @@ func (schd *Scheduler) execTask(t *Task) {
 	go func() {
 		t.Lock()
 		if t.Singleton && t.isRunning {
+			if t.ErrFuncWithTaskContext != nil {
+				go t.ErrFuncWithTaskContext(t.TaskContext, ErrTaskRunning)
+			} else {
+				go t.ErrFunc(ErrTaskRunning)
+			}
+
 			t.Unlock()
 			return
 		}

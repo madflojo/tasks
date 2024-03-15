@@ -758,19 +758,29 @@ func TestSingleInstance(t *testing.T) {
 	// Create a counter to track how many times the task is called
 	counter := NewCounter()
 
+	// Create a second counter to track number of executions
+	counter2 := NewCounter()
+
 	// Create an error channel to signal failure
 	errCh := make(chan error)
 
 	// Add a task that will increment the counter
 	_, err := scheduler.Add(&Task{
-		Interval:          time.Duration(1 * time.Second),
+		Interval:          time.Duration(500 * time.Millisecond),
 		RunSingleInstance: true,
 		TaskFunc: func() error {
+			// Increment Concurrent Counter
 			counter.Inc()
 			if counter.Val() > 1 {
 				return fmt.Errorf("Task ran more than once - count %d", counter.Val())
 			}
-			<-time.After(10 * time.Second)
+			// Increment Execution Counter
+			counter2.Inc()
+
+			// Wait for 10 seconds
+			<-time.After(5 * time.Second)
+
+			// Decrement Concurrent Counter
 			counter.Dec()
 			return nil
 		},
@@ -785,7 +795,9 @@ func TestSingleInstance(t *testing.T) {
 	// Wait for tasks to run and if no error, then we are good
 	select {
 	case <-time.After(30 * time.Second):
-		return
+		if counter2.Val() < 4 {
+			t.Fatalf("Task was not called more than once successfully - count %d", counter2.Val())
+		}
 	case e := <-errCh:
 		t.Fatalf("Error function was called - %s", e)
 	}

@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +24,33 @@ type ExecutionTestCase struct {
 	cancel    context.CancelFunc
 	task      *Task
 	callsFunc bool
+}
+
+type Counter struct {
+	sync.RWMutex
+	val int
+}
+
+func NewCounter() *Counter {
+	return &Counter{}
+}
+
+func (c *Counter) Inc() {
+	c.Lock()
+	defer c.Unlock()
+	c.val++
+}
+
+func (c *Counter) Dec() {
+	c.Lock()
+	defer c.Unlock()
+	c.val--
+}
+
+func (c *Counter) Val() int {
+	c.RLock()
+	defer c.RUnlock()
+	return c.val
 }
 
 func TestTasksInterface(t *testing.T) {
@@ -476,6 +504,7 @@ func TestAdd(t *testing.T) {
 func TestScheduler(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify Tasks Run when Added", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -581,6 +610,7 @@ func TestScheduler(t *testing.T) {
 func TestSchedulerDoesntRun(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -658,6 +688,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 func TestSchedulerExtras(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -717,4 +748,45 @@ func TestSchedulerExtras(t *testing.T) {
 			t.Errorf("Error function was not called when an error occurred")
 		}
 	})
+}
+
+func TestSingleInstance(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
+	defer scheduler.Stop()
+
+	// Create a counter to track how many times the task is called
+	counter := NewCounter()
+
+	// Create an error channel to signal failure
+	errCh := make(chan error)
+
+	// Add a task that will increment the counter
+	_, err := scheduler.Add(&Task{
+		Interval:          time.Duration(1 * time.Second),
+		RunSingleInstance: true,
+		TaskFunc: func() error {
+			counter.Inc()
+			if counter.Val() > 1 {
+				return fmt.Errorf("Task ran more than once - count %d", counter.Val())
+			}
+			<-time.After(10 * time.Second)
+			counter.Dec()
+			return nil
+		},
+		ErrFunc: func(e error) {
+			errCh <- e
+		},
+	})
+	if err != nil {
+		t.Fatalf("Unexpected errors when scheduling task - %s", err)
+	}
+
+	// Wait for tasks to run and if no error, then we are good
+	select {
+	case <-time.After(30 * time.Second):
+		return
+	case e := <-errCh:
+		t.Fatalf("Error function was called - %s", e)
+	}
 }

@@ -78,7 +78,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval: time.Duration(1 * time.Second),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		},
 	})
 
@@ -87,7 +87,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:    time.Duration(1 * time.Second),
 			TaskFunc:    func() error { return nil },
-			ErrFunc:     func(e error) {},
+			ErrFunc:     func(_ error) {},
 			TaskContext: TaskContext{Context: context.Background()},
 		},
 	})
@@ -97,7 +97,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:               time.Duration(1 * time.Second),
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
-			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 			TaskContext:            TaskContext{Context: context.Background()},
 		},
 	})
@@ -107,7 +107,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:               time.Duration(1 * time.Second),
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
-			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 		},
 	})
 
@@ -296,7 +296,7 @@ func TestTaskExecution(t *testing.T) {
 			tc4.cancel()
 			return nil
 		},
-		ErrFunc: func(e error) {
+		ErrFunc: func(error) {
 			t.Errorf("ErrFunc should not be called")
 		},
 	}
@@ -311,11 +311,11 @@ func TestTaskExecution(t *testing.T) {
 	tc5.task = &Task{
 		Interval:    time.Duration(1 * time.Second),
 		TaskContext: TaskContext{Context: tc5.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
+		FuncWithTaskContext: func(_ TaskContext) error {
 			tc5.cancel()
 			return nil
 		},
-		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
+		ErrFuncWithTaskContext: func(_ TaskContext, _ error) {
 			t.Errorf("ErrFuncWithTaskContext should not be called")
 		},
 	}
@@ -352,7 +352,7 @@ func TestTaskExecution(t *testing.T) {
 		Interval:    time.Duration(1 * time.Second),
 		StartAfter:  tc7StartAfter,
 		TaskContext: TaskContext{Context: tc7.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
+		FuncWithTaskContext: func(_ TaskContext) error {
 			if time.Now().Before(tc7StartAfter) {
 				t.Errorf("Task should not have been called before StartAfter time")
 				return nil
@@ -407,7 +407,7 @@ func TestAdd(t *testing.T) {
 		id, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -430,7 +430,7 @@ func TestAdd(t *testing.T) {
 		err := scheduler.AddWithID(id.String(), &Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -459,7 +459,7 @@ func TestAdd(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -468,7 +468,7 @@ func TestAdd(t *testing.T) {
 		err = scheduler.AddWithID(id, &Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != ErrIDInUse {
 			t.Errorf("Expected error for task with existing id")
@@ -483,7 +483,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil callback", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -493,7 +493,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil interval", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -517,7 +517,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -550,7 +550,7 @@ func TestScheduler(t *testing.T) {
 				cancel()
 				return fmt.Errorf("Fake Error")
 			},
-			ErrFuncWithTaskContext: func(ctx TaskContext, e error) {
+			ErrFuncWithTaskContext: func(ctx TaskContext, _ error) {
 				if ctx.Context != nil && ctx.Context.Err() == context.Canceled {
 					doneCh <- struct{}{}
 				}
@@ -587,7 +587,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -627,7 +627,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -657,7 +657,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -702,7 +702,7 @@ func TestSchedulerExtras(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -734,7 +734,7 @@ func TestSchedulerExtras(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Second),
 			TaskFunc: func() error { return fmt.Errorf("Errors are bad") },
-			ErrFunc:  func(e error) { doneCh <- struct{}{} },
+			ErrFunc:  func(_ error) { doneCh <- struct{}{} },
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)

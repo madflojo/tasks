@@ -117,9 +117,12 @@ type Task struct {
 	// the task self deleting.
 	RunOnce bool
 
-	// RunSingleInstance is used to set this task as a single instance task. By default, tasks will continue executing at
-	// the interval specified until deleted. With RunSingleInstance enabled the task will not execute if it is already
-	// running.
+	// RunSingleInstance is used to set a task as a single instance task. By default, tasks will continue executing at
+	// the interval specified until deleted. With RunSingleInstance enabled a subsequent task execution will be skipped
+	// if the previous task execution is still running.
+	//
+	// This is useful for tasks that may take longer than the interval to execute. This will prevent multiple instances
+	// of the same task from running concurrently.
 	RunSingleInstance bool
 
 	// StartAfter is used to specify a start time for the scheduler. When set, tasks will wait for the specified

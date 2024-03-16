@@ -3,6 +3,7 @@ package tasks
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +24,33 @@ type ExecutionTestCase struct {
 	cancel    context.CancelFunc
 	task      *Task
 	callsFunc bool
+}
+
+type Counter struct {
+	sync.RWMutex
+	val int
+}
+
+func NewCounter() *Counter {
+	return &Counter{}
+}
+
+func (c *Counter) Inc() {
+	c.Lock()
+	defer c.Unlock()
+	c.val++
+}
+
+func (c *Counter) Dec() {
+	c.Lock()
+	defer c.Unlock()
+	c.val--
+}
+
+func (c *Counter) Val() int {
+	c.RLock()
+	defer c.RUnlock()
+	return c.val
 }
 
 func TestTasksInterface(t *testing.T) {
@@ -50,7 +78,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval: time.Duration(1 * time.Second),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		},
 	})
 
@@ -59,7 +87,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:    time.Duration(1 * time.Second),
 			TaskFunc:    func() error { return nil },
-			ErrFunc:     func(e error) {},
+			ErrFunc:     func(_ error) {},
 			TaskContext: TaskContext{Context: context.Background()},
 		},
 	})
@@ -69,7 +97,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:               time.Duration(1 * time.Second),
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
-			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 			TaskContext:            TaskContext{Context: context.Background()},
 		},
 	})
@@ -79,7 +107,7 @@ func TestTasksInterface(t *testing.T) {
 		task: &Task{
 			Interval:               time.Duration(1 * time.Second),
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
-			ErrFuncWithTaskContext: func(_ TaskContext, e error) {},
+			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 		},
 	})
 
@@ -268,7 +296,7 @@ func TestTaskExecution(t *testing.T) {
 			tc4.cancel()
 			return nil
 		},
-		ErrFunc: func(e error) {
+		ErrFunc: func(error) {
 			t.Errorf("ErrFunc should not be called")
 		},
 	}
@@ -283,11 +311,11 @@ func TestTaskExecution(t *testing.T) {
 	tc5.task = &Task{
 		Interval:    time.Duration(1 * time.Second),
 		TaskContext: TaskContext{Context: tc5.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
+		FuncWithTaskContext: func(_ TaskContext) error {
 			tc5.cancel()
 			return nil
 		},
-		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
+		ErrFuncWithTaskContext: func(_ TaskContext, _ error) {
 			t.Errorf("ErrFuncWithTaskContext should not be called")
 		},
 	}
@@ -324,7 +352,7 @@ func TestTaskExecution(t *testing.T) {
 		Interval:    time.Duration(1 * time.Second),
 		StartAfter:  tc7StartAfter,
 		TaskContext: TaskContext{Context: tc7.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
+		FuncWithTaskContext: func(_ TaskContext) error {
 			if time.Now().Before(tc7StartAfter) {
 				t.Errorf("Task should not have been called before StartAfter time")
 				return nil
@@ -379,7 +407,7 @@ func TestAdd(t *testing.T) {
 		id, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -402,7 +430,7 @@ func TestAdd(t *testing.T) {
 		err := scheduler.AddWithID(id.String(), &Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -431,7 +459,7 @@ func TestAdd(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -440,7 +468,7 @@ func TestAdd(t *testing.T) {
 		err = scheduler.AddWithID(id, &Task{
 			Interval: time.Duration(1 * time.Minute),
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err != ErrIDInUse {
 			t.Errorf("Expected error for task with existing id")
@@ -455,7 +483,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil callback", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -465,7 +493,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Check for nil interval", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			TaskFunc: func() error { return nil },
-			ErrFunc:  func(e error) {},
+			ErrFunc:  func(_ error) {},
 		})
 		if err == nil {
 			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
@@ -476,6 +504,7 @@ func TestAdd(t *testing.T) {
 func TestScheduler(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify Tasks Run when Added", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -488,7 +517,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -521,7 +550,7 @@ func TestScheduler(t *testing.T) {
 				cancel()
 				return fmt.Errorf("Fake Error")
 			},
-			ErrFuncWithTaskContext: func(ctx TaskContext, e error) {
+			ErrFuncWithTaskContext: func(ctx TaskContext, _ error) {
 				if ctx.Context != nil && ctx.Context.Err() == context.Canceled {
 					doneCh <- struct{}{}
 				}
@@ -558,7 +587,7 @@ func TestScheduler(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -581,6 +610,7 @@ func TestScheduler(t *testing.T) {
 func TestSchedulerDoesntRun(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -597,7 +627,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -627,7 +657,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -658,6 +688,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 func TestSchedulerExtras(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
+	defer scheduler.Stop()
 
 	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
@@ -671,7 +702,7 @@ func TestSchedulerExtras(t *testing.T) {
 				doneCh <- struct{}{}
 				return nil
 			},
-			ErrFunc: func(e error) {},
+			ErrFunc: func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -703,7 +734,7 @@ func TestSchedulerExtras(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Second),
 			TaskFunc: func() error { return fmt.Errorf("Errors are bad") },
-			ErrFunc:  func(e error) { doneCh <- struct{}{} },
+			ErrFunc:  func(_ error) { doneCh <- struct{}{} },
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
@@ -717,4 +748,57 @@ func TestSchedulerExtras(t *testing.T) {
 			t.Errorf("Error function was not called when an error occurred")
 		}
 	})
+}
+
+func TestSingleInstance(t *testing.T) {
+	// Create a base scheduler to use
+	scheduler := New()
+	defer scheduler.Stop()
+
+	// Create a counter to track how many times the task is called
+	counter := NewCounter()
+
+	// Create a second counter to track number of executions
+	counter2 := NewCounter()
+
+	// Create an error channel to signal failure
+	errCh := make(chan error)
+
+	// Add a task that will increment the counter
+	_, err := scheduler.Add(&Task{
+		Interval:          time.Duration(500 * time.Millisecond),
+		RunSingleInstance: true,
+		TaskFunc: func() error {
+			// Increment Concurrent Counter
+			counter.Inc()
+			if counter.Val() > 1 {
+				return fmt.Errorf("Task ran more than once - count %d", counter.Val())
+			}
+			// Increment Execution Counter
+			counter2.Inc()
+
+			// Wait for 10 seconds
+			<-time.After(5 * time.Second)
+
+			// Decrement Concurrent Counter
+			counter.Dec()
+			return nil
+		},
+		ErrFunc: func(e error) {
+			errCh <- e
+		},
+	})
+	if err != nil {
+		t.Fatalf("Unexpected errors when scheduling task - %s", err)
+	}
+
+	// Wait for tasks to run and if no error, then we are good
+	select {
+	case <-time.After(30 * time.Second):
+		if counter2.Val() < 4 {
+			t.Fatalf("Task was not called more than once successfully - count %d", counter2.Val())
+		}
+	case e := <-errCh:
+		t.Fatalf("Error function was called - %s", e)
+	}
 }

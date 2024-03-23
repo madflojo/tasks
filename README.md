@@ -1,5 +1,6 @@
 # Tasks
 
+[![tests](https://github.com/madflojo/tasks/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/madflojo/tasks/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/madflojo/tasks/graph/badge.svg?token=882QTXA7PX)](https://codecov.io/gh/madflojo/tasks)
 [![Go Report Card](https://goreportcard.com/badge/github.com/madflojo/tasks)](https://goreportcard.com/report/github.com/madflojo/tasks) 
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/madflojo/tasks)](https://pkg.go.dev/github.com/madflojo/tasks)

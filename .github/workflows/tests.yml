@@ -28,7 +28,7 @@ jobs:
       run: go get -u github.com/mattn/goveralls
 
     - name: Test
-      run: go test --race -v -covermode=atomic -coverprofile=coverage.out ./...
+      run: go test -race -v -covermode=atomic -coverprofile=coverage.out ./...
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4.0.1

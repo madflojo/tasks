@@ -286,7 +286,7 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 }
 
 // Del will unschedule the specified task and remove it from the task list. Deletion will prevent future invocations of
-// a task, but not interrupt a trigged task.
+// a task, but not interrupt a triggered task.
 func (schd *Scheduler) Del(name string) {
 	schd.Lock()
 	t, ok := schd.tasks[name]

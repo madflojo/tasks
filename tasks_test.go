@@ -689,7 +689,8 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		startedCtx, started := context.WithCancel(context.Background())
 		releaseCtx, release := context.WithCancel(context.Background())
 		finishedCtx, finished := context.WithCancel(context.Background())
-		postDeleteCtx, postDelete := context.WithCancel(context.Background())
+		errCtx, errCancel := context.WithCancel(context.Background())
+		defer errCancel()
 
 		var runCount int32
 		var deleted uint32
@@ -707,13 +708,14 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				}
 
 				if atomic.LoadUint32(&deleted) == 1 {
-					postDelete()
+					return fmt.Errorf("task executed after delete, run=%d", currentRun)
 				}
 
-				t.Errorf("task executed after delete, run=%d", currentRun)
 				return nil
 			},
-			ErrFunc: func(_ error) {},
+			ErrFunc: func(_ error) {
+				errCancel()
+			},
 		})
 		if err != nil {
 			t.Fatalf("Unexpected errors when scheduling a valid task - %s", err)
@@ -737,7 +739,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		}
 
 		select {
-		case <-postDeleteCtx.Done():
+		case <-errCtx.Done():
 			t.Fatalf("Task executed again after delete")
 		case <-time.After(350 * time.Millisecond):
 		}

@@ -23,6 +23,7 @@ Below is an example of starting the scheduler and registering a new task that ru
 		Interval: time.Duration(30 * time.Second),
 		TaskFunc: func() error {
 			// Put your logic here
+			return nil
 		},
 	})
 	if err != nil {
@@ -38,6 +39,7 @@ a certain time. The below example shows this in practice.
 		StartAfter: time.Now().Add(30 * (24 * time.Hour)),
 		TaskFunc: func() error {
 			// Put your logic here
+			return nil
 		},
 	})
 	if err != nil {
@@ -49,10 +51,11 @@ waiting for 60 seconds.
 
 	// Add a one time only task for 60 seconds from now
 	id, err := scheduler.Add(&tasks.Task{
-		Interval: time.Duration(60 * time.Second)
+		Interval: time.Duration(60 * time.Second),
 		RunOnce:  true,
 		TaskFunc: func() error {
 			// Put your logic here
+			return nil
 		},
 	})
 	if err != nil {
@@ -68,9 +71,58 @@ error occurs.
 		Interval: time.Duration(30 * time.Second),
 		TaskFunc: func() error {
 			// Put your logic here
-		}(),
+			return nil
+		},
 		ErrFunc: func(e error) {
 			log.Printf("An error occurred when executing task %s - %s", id, e)
+		},
+	})
+	if err != nil {
+		// Do Stuff
+	}
+
+Tasks also supports single-instance execution for tasks that should never overlap.
+
+	// Add a single-instance task
+	id, err := scheduler.Add(&tasks.Task{
+		Interval:          time.Duration(30 * time.Second),
+		RunSingleInstance: true,
+		TaskFunc: func() error {
+			// Put your logic here
+			return nil
+		},
+	})
+	if err != nil {
+		// Do Stuff
+	}
+
+When you need access to a user-defined context or the task ID during execution, use the context-aware callbacks.
+
+	// Add a task with context-aware callbacks
+	id, err := scheduler.Add(&tasks.Task{
+		Interval: time.Duration(30 * time.Second),
+		TaskContext: tasks.TaskContext{
+			Context: context.Background(),
+		},
+		FuncWithTaskContext: func(taskCtx tasks.TaskContext) error {
+			log.Printf("running task %s", taskCtx.ID())
+			return nil
+		},
+		ErrFuncWithTaskContext: func(taskCtx tasks.TaskContext, err error) {
+			log.Printf("task %s failed: %s", taskCtx.ID(), err)
+		},
+	})
+	if err != nil {
+		// Do Stuff
+	}
+
+If you need a deterministic identifier, tasks can also be added with a custom ID.
+
+	err = scheduler.AddWithID("nightly-report", &tasks.Task{
+		Interval: time.Duration(1 * time.Hour),
+		TaskFunc: func() error {
+			// Put your logic here
+			return nil
 		},
 	})
 	if err != nil {
@@ -215,10 +267,11 @@ func New() *Scheduler {
 //		Interval: time.Duration(30 * time.Second),
 //		TaskFunc: func() error {
 //			// Put your logic here
-//		}(),
+//			return nil
+//		},
 //		ErrFunc: func(err error) {
 //			// Put custom error handling here
-//		}(),
+//		},
 //	})
 //	if err != nil {
 //		// Do stuff
@@ -242,10 +295,11 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //		Interval: time.Duration(30 * time.Second),
 //		TaskFunc: func() error {
 //			// Put your logic here
-//		}(),
+//			return nil
+//		},
 //		ErrFunc: func(err error) {
 //			// Put custom error handling here
-//		}(),
+//		},
 //	})
 //	if err != nil {
 //		// Do stuff

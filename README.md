@@ -22,7 +22,10 @@ and flexible control over when tasks are executed.
 - **Flexible Task Intervals**: Tasks uses the `time.Duration` type to specify intervals, offering a simple interface and flexible control over task execution timing.
 - **Delayed Task Start**: Schedule tasks to start at a later time by specifying a start time, allowing for greater control over task execution.
 - **One-Time Tasks**: Schedule tasks to run only once by setting the `RunOnce` flag, ideal for single-use tasks or one-time actions.
+- **Single-Instance Tasks**: Prevent overlapping runs by setting `RunSingleInstance`, which skips a run if the previous invocation is still executing.
+- **Task Context Support**: Pass user-defined context and task metadata into callbacks with `FuncWithTaskContext`, `ErrFuncWithTaskContext`, and `TaskContext.ID()`.
 - **Custom Error Handling**: Define a custom error handling function to handle errors returned by tasks, enabling tailored error handling logic.
+- **Custom Task IDs**: Provide your own task IDs with `AddWithID` when you need deterministic identifiers.
 
 ## Usage
 
@@ -40,6 +43,7 @@ id, err := scheduler.Add(&tasks.Task{
   Interval: 30 * time.Second,
   TaskFunc: func() error {
     // Put your logic here
+    return nil
   },
 })
 if err != nil {
@@ -59,6 +63,7 @@ id, err := scheduler.Add(&tasks.Task{
   StartAfter: time.Now().Add(30 * (24 * time.Hour)),
   TaskFunc: func() error {
     // Put your logic here
+    return nil
   },
 })
 if err != nil {
@@ -78,6 +83,7 @@ id, err := scheduler.Add(&tasks.Task{
   RunOnce:  true,
   TaskFunc: func() error {
     // Put your logic here
+    return nil
   },
 })
 if err != nil {
@@ -97,9 +103,68 @@ id, err := scheduler.Add(&tasks.Task{
   Interval: 30 * time.Second,
   TaskFunc: func() error {
     // Put your logic here
+    return nil
   },
   ErrFunc: func(e error) {
     log.Printf("An error occurred when executing task %s - %s", id, e)
+  },
+})
+if err != nil {
+  // Do Stuff
+}
+```
+
+### Single-Instance Tasks
+
+Use `RunSingleInstance` when a task might take longer than its interval and overlapping executions should be skipped.
+
+```go
+id, err := scheduler.Add(&tasks.Task{
+  Interval:          30 * time.Second,
+  RunSingleInstance: true,
+  TaskFunc: func() error {
+    // Put your logic here
+    return nil
+  },
+})
+if err != nil {
+  // Do Stuff
+}
+```
+
+### Task Context
+
+Use the context-aware callbacks when you want to pass a user-defined context into task execution and error handling.
+
+```go
+ctx := context.Background()
+
+id, err := scheduler.Add(&tasks.Task{
+  Interval:    30 * time.Second,
+  TaskContext: tasks.TaskContext{Context: ctx},
+  FuncWithTaskContext: func(taskCtx tasks.TaskContext) error {
+    log.Printf("running task %s", taskCtx.ID())
+    return nil
+  },
+  ErrFuncWithTaskContext: func(taskCtx tasks.TaskContext, err error) {
+    log.Printf("task %s failed: %v", taskCtx.ID(), err)
+  },
+})
+if err != nil {
+  // Do Stuff
+}
+```
+
+### Custom Task IDs
+
+Use `AddWithID` when you want to provide your own stable identifier for a task.
+
+```go
+err := scheduler.AddWithID("nightly-report", &tasks.Task{
+  Interval: time.Hour,
+  TaskFunc: func() error {
+    // Put your logic here
+    return nil
   },
 })
 if err != nil {

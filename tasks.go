@@ -315,25 +315,21 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 		return fmt.Errorf("task interval must be defined")
 	}
 
-	// Create Context used to cancel downstream Goroutines
-	t.ctx, t.cancel = context.WithCancel(context.Background())
-
-	// Add id to TaskContext
-	t.TaskContext.id = id
-
 	// Check id is not in use, then add to task list and start background task
 	schd.Lock()
 	defer schd.Unlock()
 	if _, ok := schd.tasks[id]; ok {
 		return ErrIDInUse
 	}
-	t.id = id
 
-	// To make up for bad design decisions we need to copy the task for execution
+	// Clone the caller-provided task
 	task := t.Clone()
+	task.ctx, task.cancel = context.WithCancel(context.Background())
+	task.TaskContext.id = id
+	task.id = id
 
 	// Add task to schedule
-	schd.tasks[t.id] = task
+	schd.tasks[task.id] = task
 	schd.scheduleTask(task)
 
 	return nil

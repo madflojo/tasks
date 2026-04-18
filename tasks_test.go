@@ -259,7 +259,7 @@ func TestTaskExecution(t *testing.T) {
 			return fmt.Errorf("fake error")
 		},
 		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
-			if taskCtx == tc2.task.TaskContext && e != nil {
+			if taskCtx.Context == tc2.task.TaskContext.Context && e != nil {
 				tc2.cancel()
 			}
 			if taskCtx.Context.Err() != context.Canceled {
@@ -478,6 +478,44 @@ func TestAdd(t *testing.T) {
 		_, err = scheduler.Lookup(id)
 		if err != nil {
 			t.Errorf("Unable to find previously scheduled task with Lookup - %s", err)
+		}
+	})
+
+	t.Run("Duplicate id does not mutate caller task", func(t *testing.T) {
+		id := xid.New().String()
+		err := scheduler.AddWithID(id, &Task{
+			Interval: time.Duration(1 * time.Minute),
+			TaskFunc: func() error { return nil },
+		})
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		task := &Task{
+			Interval:    time.Duration(1 * time.Minute),
+			TaskFunc:    func() error { return nil },
+			TaskContext: TaskContext{Context: context.Background()},
+		}
+
+		err = scheduler.AddWithID(id, task)
+		if err != ErrIDInUse {
+			t.Fatalf("Expected duplicate id error, got %v", err)
+		}
+
+		if task.id != "" {
+			t.Errorf("expected caller task id to remain empty, got %q", task.id)
+		}
+		if task.TaskContext.ID() != "" {
+			t.Errorf("expected caller task context id to remain empty, got %q", task.TaskContext.ID())
+		}
+		if task.ctx != nil {
+			t.Errorf("expected caller task ctx to remain nil")
+		}
+		if task.cancel != nil {
+			t.Errorf("expected caller task cancel to remain nil")
+		}
+		if task.timer != nil {
+			t.Errorf("expected caller task timer to remain nil")
 		}
 	})
 

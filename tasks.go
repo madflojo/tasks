@@ -286,28 +286,28 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 }
 
 // Del will unschedule the specified task and remove it from the task list. Deletion will prevent future invocations of
-// a task, but not interrupt a trigged task.
+// a task, but not interrupt a triggered task.
 func (schd *Scheduler) Del(name string) {
-	// Grab task from task list
-	t, err := schd.Lookup(name)
-	if err != nil {
+	schd.Lock()
+	t, ok := schd.tasks[name]
+	if !ok {
+		schd.Unlock()
 		return
 	}
+	delete(schd.tasks, name)
+	schd.Unlock()
 
 	// Stop the task
-	defer t.cancel()
+	if t.cancel != nil {
+		t.cancel()
+	}
 
 	t.Lock()
 	defer t.Unlock()
 
 	if t.timer != nil {
-		defer t.timer.Stop()
+		t.timer.Stop()
 	}
-
-	// Remove from task list
-	schd.Lock()
-	defer schd.Unlock()
-	delete(schd.tasks, name)
 }
 
 // Lookup will find the specified task from the internal task list using the task ID provided.
@@ -403,6 +403,9 @@ func (schd *Scheduler) execTask(t *Task) {
 	// Reschedule task for next execution
 	if !t.RunOnce {
 		t.safeOps(func() {
+			if t.ctx.Err() != nil || t.timer == nil {
+				return
+			}
 			t.timer.Reset(t.Interval)
 		})
 	}

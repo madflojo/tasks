@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -681,6 +682,66 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				}
 				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
 			}
+		}
+	})
+
+	t.Run("Verify Tasks Dont run when Deleted during execution", func(t *testing.T) {
+		startedCtx, started := context.WithCancel(context.Background())
+		releaseCtx, release := context.WithCancel(context.Background())
+		finishedCtx, finished := context.WithCancel(context.Background())
+		errCtx, errCancel := context.WithCancel(context.Background())
+		defer errCancel()
+
+		var runCount int32
+		var deleted uint32
+
+		id, err := scheduler.Add(&Task{
+			Interval: time.Duration(100 * time.Millisecond),
+			TaskFunc: func() error {
+				currentRun := atomic.AddInt32(&runCount, 1)
+
+				if currentRun == 1 {
+					started()
+					<-releaseCtx.Done()
+					finished()
+					return nil
+				}
+
+				if atomic.LoadUint32(&deleted) == 1 {
+					return fmt.Errorf("task executed after delete, run=%d", currentRun)
+				}
+
+				return nil
+			},
+			ErrFunc: func(_ error) {
+				errCancel()
+			},
+		})
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+		defer scheduler.Del(id)
+
+		select {
+		case <-startedCtx.Done():
+		case <-time.After(2 * time.Second):
+			t.Fatalf("Scheduler failed to start the scheduled task")
+		}
+
+		atomic.StoreUint32(&deleted, 1)
+		scheduler.Del(id)
+		release()
+
+		select {
+		case <-finishedCtx.Done():
+		case <-time.After(2 * time.Second):
+			t.Fatalf("Task did not finish after delete")
+		}
+
+		select {
+		case <-errCtx.Done():
+			t.Fatalf("Task executed again after delete")
+		case <-time.After(350 * time.Millisecond):
 		}
 	})
 }

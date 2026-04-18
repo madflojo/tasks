@@ -324,6 +324,11 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 
 	// Clone the caller-provided task
 	task := t.Clone()
+	task.id = ""
+	task.TaskContext.id = ""
+	task.ctx = nil
+	task.cancel = nil
+	task.timer = nil
 	task.ctx, task.cancel = context.WithCancel(context.Background())
 	task.TaskContext.id = id
 	task.id = id

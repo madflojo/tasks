@@ -519,6 +519,60 @@ func TestAdd(t *testing.T) {
 		}
 	})
 
+	t.Run("AddWithID does not inherit scheduler runtime state from cloned input", func(t *testing.T) {
+		waitForTaskWithTimer := func(id string) (*Task, bool) {
+			timeout := time.After(2 * time.Second)
+			tick := time.NewTicker(10 * time.Millisecond)
+			defer tick.Stop()
+			for {
+				task, err := scheduler.Lookup(id)
+				if err == nil && task.timer != nil {
+					return task, true
+				}
+				select {
+				case <-timeout:
+					return nil, false
+				case <-tick.C:
+				}
+			}
+		}
+
+		sourceID := xid.New().String()
+		err := scheduler.AddWithID(sourceID, &Task{
+			Interval: time.Duration(1 * time.Minute),
+			TaskFunc: func() error { return nil },
+		})
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling source task - %s", err)
+		}
+
+		sourceTask, ok := waitForTaskWithTimer(sourceID)
+		if !ok {
+			t.Fatalf("expected source task timer to be set")
+		}
+		if sourceTask.ctx == nil {
+			t.Fatalf("expected source task context to be set")
+		}
+
+		targetID := xid.New().String()
+		err = scheduler.AddWithID(targetID, sourceTask)
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling target task - %s", err)
+		}
+		defer scheduler.Del(targetID)
+
+		targetTask, ok := waitForTaskWithTimer(targetID)
+		if !ok {
+			t.Fatalf("expected target task timer to be set")
+		}
+		if targetTask.timer == sourceTask.timer {
+			t.Errorf("expected target task timer to be newly allocated")
+		}
+		if targetTask.ctx == sourceTask.ctx {
+			t.Errorf("expected target task context to be newly allocated")
+		}
+	})
+
 	t.Run("Check for nil callback", func(t *testing.T) {
 		_, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),

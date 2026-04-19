@@ -177,3 +177,14 @@ For more details on usage, see the [GoDoc](https://pkg.go.dev/github.com/madfloj
 ## Contributing
 
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+
+## Development
+
+Common local workflows are available through the repository `Makefile`:
+
+- `make build`
+- `make tests`
+- `make benchmarks`
+- `make coverage`
+- `make lint`
+- `make format`

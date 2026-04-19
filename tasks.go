@@ -315,25 +315,17 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 		return fmt.Errorf("task interval must be defined")
 	}
 
-	// Create Context used to cancel downstream Goroutines
-	t.ctx, t.cancel = context.WithCancel(context.Background())
-
-	// Add id to TaskContext
-	t.TaskContext.id = id
-
 	// Check id is not in use, then add to task list and start background task
 	schd.Lock()
 	defer schd.Unlock()
 	if _, ok := schd.tasks[id]; ok {
 		return ErrIDInUse
 	}
-	t.id = id
 
-	// To make up for bad design decisions we need to copy the task for execution
-	task := t.Clone()
+	task := t.cloneForScheduling(id)
 
 	// Add task to schedule
-	schd.tasks[t.id] = task
+	schd.tasks[task.id] = task
 	schd.scheduleTask(task)
 
 	return nil
@@ -471,8 +463,8 @@ func (ctx TaskContext) ID() string {
 	return ctx.id
 }
 
-// Clone will create a copy of the existing task. This is useful for creating a new task with the same properties as
-// an existing task. It is also used internally when creating a new task.
+// Clone will create a copy of the existing task definition. Scheduler-owned runtime state is intentionally excluded so
+// the returned task can be treated as a reusable configuration template.
 func (t *Task) Clone() *Task {
 	task := &Task{}
 	t.safeOps(func() {
@@ -484,11 +476,16 @@ func (t *Task) Clone() *Task {
 		task.StartAfter = t.StartAfter
 		task.RunOnce = t.RunOnce
 		task.RunSingleInstance = t.RunSingleInstance
-		task.id = t.id
-		task.ctx = t.ctx
-		task.cancel = t.cancel
-		task.timer = t.timer
 		task.TaskContext = t.TaskContext
+		task.TaskContext.id = ""
 	})
+	return task
+}
+
+func (t *Task) cloneForScheduling(id string) *Task {
+	task := t.Clone()
+	task.ctx, task.cancel = context.WithCancel(context.Background())
+	task.TaskContext.id = id
+	task.id = id
 	return task
 }

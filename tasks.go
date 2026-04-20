@@ -247,6 +247,9 @@ type Scheduler struct {
 }
 
 var (
+	// ErrNilTask is returned when a nil task is provided to Add or AddWithID.
+	ErrNilTask = fmt.Errorf("task cannot be nil")
+
 	// ErrIDInUse is returned when a Task ID is specified but already used.
 	ErrIDInUse = fmt.Errorf("ID already used")
 )
@@ -282,7 +285,10 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 	if err == ErrIDInUse {
 		return schd.Add(t)
 	}
-	return id.String(), err
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }
 
 // AddWithID will add a task with an ID to the task list and schedule it. It will return an error if the ID is in-use.
@@ -305,6 +311,10 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 //		// Do stuff
 //	}
 func (schd *Scheduler) AddWithID(id string, t *Task) error {
+	if t == nil {
+		return ErrNilTask
+	}
+
 	// Check if TaskFunc is nil before doing anything
 	if t.TaskFunc == nil && t.FuncWithTaskContext == nil {
 		return fmt.Errorf("task function cannot be nil")
@@ -358,8 +368,8 @@ func (schd *Scheduler) Del(name string) {
 
 // Lookup will find the specified task from the internal task list using the task ID provided.
 //
-// The returned task should be treated as read-only, and not modified outside of this package. Doing so, may cause
-// panics.
+// The returned task is a copy of the scheduled task configuration. Scheduler-owned runtime state is intentionally
+// excluded from the returned task.
 func (schd *Scheduler) Lookup(name string) (*Task, error) {
 	schd.RLock()
 	defer schd.RUnlock()
@@ -372,8 +382,8 @@ func (schd *Scheduler) Lookup(name string) (*Task, error) {
 
 // Tasks is used to return a copy of the internal tasks map.
 //
-// The returned task should be treated as read-only, and not modified outside of this package. Doing so, may cause
-// panics.
+// Each task in the returned map is a copy of the scheduled task configuration. Scheduler-owned runtime state is
+// intentionally excluded from the returned tasks.
 func (schd *Scheduler) Tasks() map[string]*Task {
 	schd.RLock()
 	defer schd.RUnlock()

@@ -404,6 +404,29 @@ func TestAdd(t *testing.T) {
 	scheduler := New()
 	defer scheduler.Stop()
 
+	t.Run("Add a nil task returns ErrNilTask", func(t *testing.T) {
+		id, err := scheduler.Add(nil)
+		if err != ErrNilTask {
+			t.Fatalf("expected ErrNilTask, got %v", err)
+		}
+		if id != "" {
+			t.Fatalf("expected empty ID for nil task, got %q", id)
+		}
+		if _, lookupErr := scheduler.Lookup(id); lookupErr == nil {
+			t.Fatalf("nil task should not be added to the scheduler")
+		}
+	})
+
+	t.Run("AddWithID a nil task returns ErrNilTask", func(t *testing.T) {
+		err := scheduler.AddWithID("nil-task", nil)
+		if err != ErrNilTask {
+			t.Fatalf("expected ErrNilTask, got %v", err)
+		}
+		if _, lookupErr := scheduler.Lookup("nil-task"); lookupErr == nil {
+			t.Fatalf("nil task should not be added to the scheduler")
+		}
+	})
+
 	t.Run("Add a valid task and look it up", func(t *testing.T) {
 		id, err := scheduler.Add(&Task{
 			Interval: time.Duration(1 * time.Minute),
@@ -506,7 +529,10 @@ func TestAdd(t *testing.T) {
 			t.Errorf("expected caller task id to remain empty, got %q", task.id)
 		}
 		if task.TaskContext.ID() != "" {
-			t.Errorf("expected caller task context id to remain empty, got %q", task.TaskContext.ID())
+			t.Errorf(
+				"expected caller task context id to remain empty, got %q",
+				task.TaskContext.ID(),
+			)
 		}
 		if task.ctx != nil {
 			t.Errorf("expected caller task ctx to remain nil")
@@ -537,7 +563,10 @@ func TestAdd(t *testing.T) {
 			t.Fatalf("expected source task id to be omitted, got %q", sourceTask.id)
 		}
 		if sourceTask.TaskContext.ID() != "" {
-			t.Fatalf("expected source task context id to be omitted, got %q", sourceTask.TaskContext.ID())
+			t.Fatalf(
+				"expected source task context id to be omitted, got %q",
+				sourceTask.TaskContext.ID(),
+			)
 		}
 		if sourceTask.ctx != nil {
 			t.Fatalf("expected source task context to be omitted")
@@ -607,7 +636,10 @@ func TestScheduler(t *testing.T) {
 			case <-doneCh:
 				continue
 			case <-time.After(2 * time.Second):
-				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+				t.Errorf(
+					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					i,
+				)
 			}
 		}
 	})
@@ -644,7 +676,10 @@ func TestScheduler(t *testing.T) {
 			case <-doneCh:
 				continue
 			case <-time.After(2 * time.Second):
-				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+				t.Errorf(
+					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					i,
+				)
 			}
 		}
 	})
@@ -675,7 +710,11 @@ func TestScheduler(t *testing.T) {
 		select {
 		case <-doneCh:
 			if time.Now().Before(sa) {
-				t.Errorf("Task executed before the defined start time now %s, supposed to be %s", time.Now().String(), sa.String())
+				t.Errorf(
+					"Task executed before the defined start time now %s, supposed to be %s",
+					time.Now().String(),
+					sa.String(),
+				)
 			}
 			return
 		case <-time.After(15 * time.Second):
@@ -756,7 +795,10 @@ func TestSchedulerDoesntRun(t *testing.T) {
 				if i > 2 {
 					return
 				}
-				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+				t.Errorf(
+					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					i,
+				)
 			}
 		}
 	})
@@ -858,7 +900,10 @@ func TestSchedulerExtras(t *testing.T) {
 				if i == 1 {
 					return
 				}
-				t.Errorf("Scheduler failed to execute the scheduled tasks %d run within 2 seconds", i)
+				t.Errorf(
+					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					i,
+				)
 			}
 		}
 	})

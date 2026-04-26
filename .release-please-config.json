@@ -9,7 +9,6 @@
       "package-name": "",
       "bump-minor-pre-major": true,
       "include-v-in-tag": true,
-      "extra-files": ["go.mod"],
       "changelog-path": "CHANGELOG.md"
     }
   },

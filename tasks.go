@@ -133,6 +133,7 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -249,10 +250,19 @@ type Scheduler struct {
 
 var (
 	// ErrNilTask is returned when a nil task is provided to Add or AddWithID.
-	ErrNilTask = fmt.Errorf("task cannot be nil")
+	ErrNilTask = errors.New("task cannot be nil")
 
 	// ErrIDInUse is returned when a Task ID is specified but already used.
-	ErrIDInUse = fmt.Errorf("ID already used")
+	ErrIDInUse = errors.New("ID already used")
+
+	// ErrMissingTaskFunc is returned when a task has no executable callback.
+	ErrMissingTaskFunc = errors.New("either TaskFunc or FuncWithTaskContext must be provided")
+
+	// ErrInvalidInterval is returned when a task interval is not greater than zero.
+	ErrInvalidInterval = errors.New("task interval must be greater than zero")
+
+	// ErrTaskNotFound is returned when a task ID does not exist in the scheduler.
+	ErrTaskNotFound = errors.New("task not found")
 )
 
 // New will create a new scheduler instance that allows users to create and manage tasks.
@@ -283,7 +293,7 @@ func New() *Scheduler {
 func (schd *Scheduler) Add(t *Task) (string, error) {
 	id := xid.New()
 	err := schd.AddWithID(id.String(), t)
-	if err == ErrIDInUse {
+	if errors.Is(err, ErrIDInUse) {
 		return schd.Add(t)
 	}
 	if err != nil {
@@ -318,12 +328,12 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 
 	// Check if TaskFunc is nil before doing anything
 	if t.TaskFunc == nil && t.FuncWithTaskContext == nil {
-		return fmt.Errorf("task function cannot be nil")
+		return ErrMissingTaskFunc
 	}
 
-	// Ensure Interval is never 0, this would cause Timer to panic
+	// Ensure Interval is positive to avoid immediate firing and tight rescheduling.
 	if t.Interval <= time.Duration(0) {
-		return fmt.Errorf("task interval must be defined")
+		return ErrInvalidInterval
 	}
 
 	// Check id is not in use, then add to task list and start background task
@@ -378,7 +388,7 @@ func (schd *Scheduler) Lookup(name string) (*Task, error) {
 	if ok {
 		return t.Clone(), nil
 	}
-	return t, fmt.Errorf("could not find task within the task list")
+	return t, fmt.Errorf("%w: %s", ErrTaskNotFound, name)
 }
 
 // Tasks is used to return a copy of the internal tasks map.

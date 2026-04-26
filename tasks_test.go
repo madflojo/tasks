@@ -13,6 +13,13 @@ import (
 	"github.com/rs/xid"
 )
 
+const (
+	testInterval     = 25 * time.Millisecond
+	testStartDelay   = 75 * time.Millisecond
+	testTimeout      = 2 * time.Second
+	testNoRunTimeout = 150 * time.Millisecond
+)
+
 type InterfaceTestCase struct {
 	name   string
 	task   *Task
@@ -21,10 +28,8 @@ type InterfaceTestCase struct {
 }
 
 type ExecutionTestCase struct {
-	name      string
 	id        string
 	ctx       context.Context
-	cancel    context.CancelFunc
 	task      *Task
 	callsFunc bool
 }
@@ -62,7 +67,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Basic Valid Task",
 		task: &Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error { return nil },
 		},
 	})
@@ -70,7 +75,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Basic Valid Task with ID",
 		task: &Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error { return nil },
 		},
 		id: xid.New().String(),
@@ -79,7 +84,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with ErrFunc",
 		task: &Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		},
@@ -88,7 +93,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with Context",
 		task: &Task{
-			Interval:    time.Duration(1 * time.Second),
+			Interval:    testInterval,
 			TaskFunc:    func() error { return nil },
 			ErrFunc:     func(_ error) {},
 			TaskContext: TaskContext{Context: context.Background()},
@@ -98,7 +103,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with Context and WithContextFuncs",
 		task: &Task{
-			Interval:               time.Duration(1 * time.Second),
+			Interval:               testInterval,
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
 			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 			TaskContext:            TaskContext{Context: context.Background()},
@@ -108,7 +113,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task without Context but WithContextFuncs",
 		task: &Task{
-			Interval:               time.Duration(1 * time.Second),
+			Interval:               testInterval,
 			FuncWithTaskContext:    func(_ TaskContext) error { return nil },
 			ErrFuncWithTaskContext: func(_ TaskContext, _ error) {},
 		},
@@ -117,16 +122,16 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with StartAfter",
 		task: &Task{
-			Interval:   time.Duration(1 * time.Second),
+			Interval:   testInterval,
 			TaskFunc:   func() error { return nil },
-			StartAfter: time.Now().Add(time.Duration(1 * time.Second)),
+			StartAfter: time.Now().Add(testInterval),
 		},
 	})
 
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with StartAfter but in the past",
 		task: &Task{
-			Interval:   time.Duration(1 * time.Second),
+			Interval:   testInterval,
 			TaskFunc:   func() error { return nil },
 			StartAfter: time.Now().Add(time.Duration(-1 * time.Minute)),
 		},
@@ -135,7 +140,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "Valid Task with RunOnce",
 		task: &Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error { return nil },
 			RunOnce:  true,
 		},
@@ -152,7 +157,7 @@ func TestTasksInterface(t *testing.T) {
 	tt = append(tt, InterfaceTestCase{
 		name: "No TaskFunc or FuncWithTaskContext",
 		task: &Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 		},
 		addErr: true,
 	})
@@ -223,151 +228,172 @@ func TestTaskExecution(t *testing.T) {
 	scheduler := New()
 	defer scheduler.Stop()
 
-	// Setup table tests
-	var tt []ExecutionTestCase
+	cases := []struct {
+		name string
+		new  func(*testing.T) ExecutionTestCase
+	}{
+		{
+			name: "Valid Task",
+			new: func(_ *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				return ExecutionTestCase{
+					ctx:       ctx,
+					callsFunc: true,
+					task: &Task{
+						Interval: testInterval,
+						TaskFunc: func() error { return fmt.Errorf("fake error") },
+						ErrFunc: func(e error) {
+							if e != nil {
+								cancel()
+							}
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "Valid Task with TaskContext",
+			new: func(t *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				task := &Task{
+					Interval:    testInterval,
+					TaskContext: TaskContext{Context: ctx},
+					FuncWithTaskContext: func(taskCtx TaskContext) error {
+						if taskCtx.Context != ctx {
+							t.Logf("TaskContext.Context does not match expected context")
+							// return with no error to trigger a timeout failure
+							return nil
+						}
+						return fmt.Errorf("fake error")
+					},
+					ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
+						if taskCtx.Context == ctx && e != nil {
+							cancel()
+						}
+						if taskCtx.Context.Err() != context.Canceled {
+							t.Errorf("TaskContext.Context should be canceled")
+						}
+					},
+				}
 
-	// Define a basic task
-	tc := ExecutionTestCase{
-		name:      "Valid Task",
-		callsFunc: true,
-	}
-	tc.ctx, tc.cancel = context.WithCancel(context.Background())
-	tc.task = &Task{
-		Interval: time.Duration(1 * time.Second),
-		TaskFunc: func() error { return fmt.Errorf("fake error") },
-		ErrFunc: func(e error) {
-			if e != nil {
-				tc.cancel()
-			}
+				return ExecutionTestCase{
+					ctx:       ctx,
+					task:      task,
+					callsFunc: true,
+				}
+			},
+		},
+		{
+			name: "Cancel a Task before it's called",
+			new: func(_ *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				return ExecutionTestCase{
+					ctx: ctx,
+					task: &Task{
+						Interval:    testInterval,
+						StartAfter:  time.Now().Add(testStartDelay),
+						TaskContext: TaskContext{Context: ctx},
+						TaskFunc: func() error {
+							cancel()
+							return nil
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "Only call ErrFunc if error",
+			new: func(t *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				return ExecutionTestCase{
+					ctx:       ctx,
+					callsFunc: true,
+					task: &Task{
+						Interval: testInterval,
+						TaskFunc: func() error {
+							cancel()
+							return nil
+						},
+						ErrFunc: func(error) {
+							t.Errorf("ErrFunc should not be called")
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "Only call ErrFuncWithTaskContext if error",
+			new: func(t *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				return ExecutionTestCase{
+					ctx:       ctx,
+					callsFunc: true,
+					task: &Task{
+						Interval:    testInterval,
+						TaskContext: TaskContext{Context: ctx},
+						FuncWithTaskContext: func(_ TaskContext) error {
+							cancel()
+							return nil
+						},
+						ErrFuncWithTaskContext: func(_ TaskContext, _ error) {
+							t.Errorf("ErrFuncWithTaskContext should not be called")
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "Validate TaskContext ID",
+			new: func(t *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				const id = "test-id"
+				return ExecutionTestCase{
+					id:        id,
+					ctx:       ctx,
+					callsFunc: true,
+					task: &Task{
+						Interval:    testInterval,
+						TaskContext: TaskContext{Context: ctx},
+						FuncWithTaskContext: func(taskCtx TaskContext) error {
+							if taskCtx.ID() != id {
+								t.Errorf("TaskContext.ID does not match expected ID")
+							}
+							cancel()
+							return nil
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "Verify StartAfter time is respected",
+			new: func(t *testing.T) ExecutionTestCase {
+				ctx, cancel := context.WithCancel(context.Background())
+				startAfter := time.Now().Add(testStartDelay)
+				return ExecutionTestCase{
+					ctx:       ctx,
+					callsFunc: true,
+					task: &Task{
+						Interval:    testInterval,
+						StartAfter:  startAfter,
+						TaskContext: TaskContext{Context: ctx},
+						FuncWithTaskContext: func(_ TaskContext) error {
+							if time.Now().Before(startAfter) {
+								t.Errorf("Task should not have been called before StartAfter time")
+								return nil
+							}
+							cancel()
+							return nil
+						},
+					},
+				}
+			},
 		},
 	}
-	tt = append(tt, tc)
 
-	// Define a task with TaskContext
-	tc2 := ExecutionTestCase{
-		name:      "Valid Task with TaskContext",
-		callsFunc: true,
-	}
-	tc2.ctx, tc2.cancel = context.WithCancel(context.Background())
-	tc2.task = &Task{
-		Interval:    time.Duration(1 * time.Second),
-		TaskContext: TaskContext{Context: tc2.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
-			if taskCtx.Context != tc2.ctx {
-				t.Logf("TaskContext.Context does not match expected context")
-				// return with no error to trigger a timeout failure
-				return nil
-			}
-			return fmt.Errorf("fake error")
-		},
-		ErrFuncWithTaskContext: func(taskCtx TaskContext, e error) {
-			if taskCtx.Context == tc2.task.TaskContext.Context && e != nil {
-				tc2.cancel()
-			}
-			if taskCtx.Context.Err() != context.Canceled {
-				t.Errorf("TaskContext.Context should be canceled")
-			}
-		},
-	}
-	tt = append(tt, tc2)
-
-	// Define a task then cancel it
-	tc3 := ExecutionTestCase{
-		name: "Cancel a Task before it's called",
-	}
-	tc3.ctx, tc3.cancel = context.WithCancel(context.Background())
-	tc3.task = &Task{
-		Interval:    time.Duration(1 * time.Second),
-		StartAfter:  time.Now().Add(time.Duration(5 * time.Second)),
-		TaskContext: TaskContext{Context: tc3.ctx},
-		TaskFunc: func() error {
-			tc.cancel()
-			return nil
-		},
-	}
-	tt = append(tt, tc3)
-
-	// Only call ErrFunc if error
-	tc4 := ExecutionTestCase{
-		name:      "Only call ErrFunc if error",
-		callsFunc: true,
-	}
-	tc4.ctx, tc4.cancel = context.WithCancel(context.Background())
-	tc4.task = &Task{
-		Interval: time.Duration(1 * time.Second),
-		TaskFunc: func() error {
-			tc4.cancel()
-			return nil
-		},
-		ErrFunc: func(error) {
-			t.Errorf("ErrFunc should not be called")
-		},
-	}
-	tt = append(tt, tc4)
-
-	// Only call ErrFuncWithTaskContext if error
-	tc5 := ExecutionTestCase{
-		name:      "Only call ErrFuncWithTaskContext if error",
-		callsFunc: true,
-	}
-	tc5.ctx, tc5.cancel = context.WithCancel(context.Background())
-	tc5.task = &Task{
-		Interval:    time.Duration(1 * time.Second),
-		TaskContext: TaskContext{Context: tc5.ctx},
-		FuncWithTaskContext: func(_ TaskContext) error {
-			tc5.cancel()
-			return nil
-		},
-		ErrFuncWithTaskContext: func(_ TaskContext, _ error) {
-			t.Errorf("ErrFuncWithTaskContext should not be called")
-		},
-	}
-	tt = append(tt, tc5)
-
-	// Validate TaskContext ID
-	tc6 := ExecutionTestCase{
-		name:      "Validate TaskContext ID",
-		callsFunc: true,
-		id:        "test-id",
-	}
-	tc6.ctx, tc6.cancel = context.WithCancel(context.Background())
-	tc6.task = &Task{
-		Interval:    time.Duration(1 * time.Second),
-		TaskContext: TaskContext{Context: tc6.ctx},
-		FuncWithTaskContext: func(taskCtx TaskContext) error {
-			if taskCtx.ID() != tc6.id {
-				t.Errorf("TaskContext.ID does not match expected ID")
-			}
-			tc6.cancel()
-			return nil
-		},
-	}
-	tt = append(tt, tc6)
-
-	// Verify that StartAfter time is respected
-	tc7 := ExecutionTestCase{
-		name:      "Verify StartAfter time is respected",
-		callsFunc: true,
-	}
-	tc7StartAfter := time.Now().Add(time.Duration(5 * time.Second))
-	tc7.ctx, tc7.cancel = context.WithCancel(context.Background())
-	tc7.task = &Task{
-		Interval:    time.Duration(1 * time.Second),
-		StartAfter:  tc7StartAfter,
-		TaskContext: TaskContext{Context: tc7.ctx},
-		FuncWithTaskContext: func(_ TaskContext) error {
-			if time.Now().Before(tc7StartAfter) {
-				t.Errorf("Task should not have been called before StartAfter time")
-				return nil
-			}
-			tc7.cancel()
-			return nil
-		},
-	}
-	tt = append(tt, tc7)
-
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			tc := testCase.new(t)
 			var err error
 			id := tc.id
 
@@ -379,10 +405,16 @@ func TestTaskExecution(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected errors when scheduling a task - %s", err)
 			}
+			defer scheduler.Del(id)
 
 			// Cancel the task if it's not supposed to be called
 			if !tc.callsFunc {
 				scheduler.Del(id)
+			}
+
+			timeout := testTimeout
+			if !tc.callsFunc {
+				timeout = testNoRunTimeout
 			}
 
 			select {
@@ -391,11 +423,11 @@ func TestTaskExecution(t *testing.T) {
 					return
 				}
 				t.Errorf("Task was executed when it should not have been")
-			case <-time.After(time.Duration(10 * time.Second)):
+			case <-time.After(timeout):
 				if !tc.callsFunc {
 					return
 				}
-				t.Errorf("Task did not execute within 10 seconds")
+				t.Errorf("Task did not execute within %s", timeout)
 			}
 		})
 	}
@@ -406,32 +438,75 @@ func TestAdd(t *testing.T) {
 	scheduler := New()
 	defer scheduler.Stop()
 
-	t.Run("Add a nil task returns ErrNilTask", func(t *testing.T) {
-		id, err := scheduler.Add(nil)
-		if !errors.Is(err, ErrNilTask) {
-			t.Fatalf("expected ErrNilTask, got %v", err)
-		}
-		if id != "" {
-			t.Fatalf("expected empty ID for nil task, got %q", id)
-		}
-		if _, lookupErr := scheduler.Lookup(id); !errors.Is(lookupErr, ErrTaskNotFound) {
-			t.Fatalf("expected ErrTaskNotFound for nil task lookup, got %v", lookupErr)
-		}
-	})
+	errorTests := []struct {
+		name     string
+		id       string
+		task     *Task
+		addWith  bool
+		wantID   string
+		wantErr  error
+		lookupID string
+	}{
+		{
+			name:     "Add a nil task returns ErrNilTask",
+			wantErr:  ErrNilTask,
+			lookupID: "",
+		},
+		{
+			name:     "AddWithID a nil task returns ErrNilTask",
+			id:       "nil-task",
+			addWith:  true,
+			wantErr:  ErrNilTask,
+			lookupID: "nil-task",
+		},
+		{
+			name: "Check for nil callback",
+			task: &Task{
+				Interval: time.Minute,
+				ErrFunc:  func(_ error) {},
+			},
+			wantErr: ErrMissingTaskFunc,
+		},
+		{
+			name: "Check for nil interval",
+			task: &Task{
+				TaskFunc: func() error { return nil },
+				ErrFunc:  func(_ error) {},
+			},
+			wantErr: ErrInvalidInterval,
+		},
+	}
 
-	t.Run("AddWithID a nil task returns ErrNilTask", func(t *testing.T) {
-		err := scheduler.AddWithID("nil-task", nil)
-		if !errors.Is(err, ErrNilTask) {
-			t.Fatalf("expected ErrNilTask, got %v", err)
-		}
-		if _, lookupErr := scheduler.Lookup("nil-task"); !errors.Is(lookupErr, ErrTaskNotFound) {
-			t.Fatalf("expected ErrTaskNotFound for nil task lookup, got %v", lookupErr)
-		}
-	})
+	for _, tc := range errorTests {
+		t.Run(tc.name, func(t *testing.T) {
+			id := tc.wantID
+			var err error
+			if tc.addWith {
+				err = scheduler.AddWithID(tc.id, tc.task)
+			} else {
+				id, err = scheduler.Add(tc.task)
+			}
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("expected %v, got %v", tc.wantErr, err)
+			}
+			if id != tc.wantID {
+				t.Fatalf("expected ID %q, got %q", tc.wantID, id)
+			}
+			if tc.lookupID != "" || tc.wantErr == ErrNilTask {
+				lookupID := tc.lookupID
+				if lookupID == "" {
+					lookupID = id
+				}
+				if _, lookupErr := scheduler.Lookup(lookupID); !errors.Is(lookupErr, ErrTaskNotFound) {
+					t.Fatalf("expected ErrTaskNotFound for lookup %q, got %v", lookupID, lookupErr)
+				}
+			}
+		})
+	}
 
 	t.Run("Add a valid task and look it up", func(t *testing.T) {
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Minute),
+			Interval: time.Minute,
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		})
@@ -454,7 +529,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Add a valid task with an id and look it up", func(t *testing.T) {
 		id := xid.New()
 		err := scheduler.AddWithID(id.String(), &Task{
-			Interval: time.Duration(1 * time.Minute),
+			Interval: time.Minute,
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		})
@@ -475,24 +550,18 @@ func TestAdd(t *testing.T) {
 	})
 
 	t.Run("Add a invalid task with an duplicate id and look it up", func(t *testing.T) {
-		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
-
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Second),
-			TaskFunc: func() error {
-				doneCh <- struct{}{}
-				return nil
-			},
-			ErrFunc: func(_ error) {},
+			Interval: time.Minute,
+			TaskFunc: func() error { return nil },
+			ErrFunc:  func(_ error) {},
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
 		}
 
 		err = scheduler.AddWithID(id, &Task{
-			Interval: time.Duration(1 * time.Minute),
+			Interval: time.Minute,
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		})
@@ -509,7 +578,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Duplicate id does not mutate caller task", func(t *testing.T) {
 		id := xid.New().String()
 		err := scheduler.AddWithID(id, &Task{
-			Interval: time.Duration(1 * time.Minute),
+			Interval: time.Minute,
 			TaskFunc: func() error { return nil },
 		})
 		if err != nil {
@@ -517,7 +586,7 @@ func TestAdd(t *testing.T) {
 		}
 
 		task := &Task{
-			Interval:    time.Duration(1 * time.Minute),
+			Interval:    time.Minute,
 			TaskFunc:    func() error { return nil },
 			TaskContext: TaskContext{Context: context.Background()},
 		}
@@ -550,7 +619,7 @@ func TestAdd(t *testing.T) {
 	t.Run("Lookup returns a reusable task definition without runtime state", func(t *testing.T) {
 		sourceID := xid.New().String()
 		err := scheduler.AddWithID(sourceID, &Task{
-			Interval: time.Duration(1 * time.Minute),
+			Interval: time.Minute,
 			TaskFunc: func() error { return nil },
 		})
 		if err != nil {
@@ -588,26 +657,6 @@ func TestAdd(t *testing.T) {
 		defer scheduler.Del(targetID)
 	})
 
-	t.Run("Check for nil callback", func(t *testing.T) {
-		_, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Minute),
-			ErrFunc:  func(_ error) {},
-		})
-		if !errors.Is(err, ErrMissingTaskFunc) {
-			t.Errorf("expected ErrMissingTaskFunc when scheduling an invalid task, got %v", err)
-		}
-	})
-
-	t.Run("Check for nil interval", func(t *testing.T) {
-		_, err := scheduler.Add(&Task{
-			TaskFunc: func() error { return nil },
-			ErrFunc:  func(_ error) {},
-		})
-		if !errors.Is(err, ErrInvalidInterval) {
-			t.Errorf("expected ErrInvalidInterval when scheduling an invalid task, got %v", err)
-		}
-	})
-
 	t.Run("Lookup missing task returns ErrTaskNotFound", func(t *testing.T) {
 		const missingID = "missing-task"
 		_, err := scheduler.Lookup(missingID)
@@ -627,11 +676,11 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("Verify Tasks Run when Added", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 6)
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error {
 				doneCh <- struct{}{}
 				return nil
@@ -648,7 +697,7 @@ func TestScheduler(t *testing.T) {
 			select {
 			case <-doneCh:
 				continue
-			case <-time.After(2 * time.Second):
+			case <-time.After(testTimeout):
 				t.Errorf(
 					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
 					i,
@@ -659,14 +708,14 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("Verify TasksWithContext Run when Added", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 6)
 
 		// User-defined context
 		ctx, cancel := context.WithCancel(context.Background())
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval:    time.Duration(1 * time.Second),
+			Interval:    testInterval,
 			TaskContext: TaskContext{Context: ctx},
 			FuncWithTaskContext: func(_ TaskContext) error {
 				cancel()
@@ -688,7 +737,7 @@ func TestScheduler(t *testing.T) {
 			select {
 			case <-doneCh:
 				continue
-			case <-time.After(2 * time.Second):
+			case <-time.After(testTimeout):
 				t.Errorf(
 					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
 					i,
@@ -699,14 +748,14 @@ func TestScheduler(t *testing.T) {
 
 	t.Run("Verify StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 1)
 
 		// Create a Start time
-		sa := time.Now().Add(10 * time.Second)
+		sa := time.Now().Add(testStartDelay)
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval:   time.Duration(1 * time.Second),
+			Interval:   testInterval,
 			StartAfter: sa,
 			TaskFunc: func() error {
 				doneCh <- struct{}{}
@@ -730,8 +779,8 @@ func TestScheduler(t *testing.T) {
 				)
 			}
 			return
-		case <-time.After(15 * time.Second):
-			t.Errorf("Scheduler failed to execute the scheduled tasks within 15 seconds")
+		case <-time.After(testTimeout):
+			t.Errorf("Scheduler failed to execute the scheduled tasks within %s", testTimeout)
 		}
 	})
 }
@@ -743,14 +792,14 @@ func TestSchedulerDoesntRun(t *testing.T) {
 
 	t.Run("Verify Cancelling a StartAfter works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 1)
 
 		// Create a Start time
-		sa := time.Now().Add(10 * time.Second)
+		sa := time.Now().Add(testStartDelay)
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval:   time.Duration(1 * time.Second),
+			Interval:   testInterval,
 			StartAfter: sa,
 			TaskFunc: func() error {
 				doneCh <- struct{}{}
@@ -770,18 +819,18 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		case <-doneCh:
 			t.Errorf("Task executed it was supposed to be cancelled")
 			return
-		case <-time.After(15 * time.Second):
+		case <-time.After(testNoRunTimeout):
 			return
 		}
 	})
 
 	t.Run("Verify Tasks Dont run when Deleted", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 6)
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			TaskFunc: func() error {
 				doneCh <- struct{}{}
 				return nil
@@ -795,6 +844,11 @@ func TestSchedulerDoesntRun(t *testing.T) {
 
 		// Make sure it runs especially when we want it too
 		for i := 0; i < 6; i++ {
+			timeout := testTimeout
+			if i > 2 {
+				timeout = testNoRunTimeout
+			}
+
 			select {
 			case <-doneCh:
 				if i == 2 {
@@ -804,7 +858,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 					t.Errorf("Task should not have exceeded 2, count is %d", i)
 				}
 				continue
-			case <-time.After(2 * time.Second):
+			case <-time.After(timeout):
 				if i > 2 {
 					return
 				}
@@ -827,7 +881,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 		var deleted uint32
 
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(100 * time.Millisecond),
+			Interval: testInterval,
 			TaskFunc: func() error {
 				currentRun := atomic.AddInt32(&runCount, 1)
 
@@ -855,7 +909,7 @@ func TestSchedulerDoesntRun(t *testing.T) {
 
 		select {
 		case <-startedCtx.Done():
-		case <-time.After(2 * time.Second):
+		case <-time.After(testTimeout):
 			t.Fatalf("Scheduler failed to start the scheduled task")
 		}
 
@@ -865,14 +919,14 @@ func TestSchedulerDoesntRun(t *testing.T) {
 
 		select {
 		case <-finishedCtx.Done():
-		case <-time.After(2 * time.Second):
+		case <-time.After(testTimeout):
 			t.Fatalf("Task did not finish after delete")
 		}
 
 		select {
 		case <-errCtx.Done():
 			t.Fatalf("Task executed again after delete")
-		case <-time.After(350 * time.Millisecond):
+		case <-time.After(testNoRunTimeout):
 		}
 	})
 }
@@ -884,11 +938,11 @@ func TestSchedulerExtras(t *testing.T) {
 
 	t.Run("Verify RunOnce works as expected", func(t *testing.T) {
 		// Channel for orchestrating when the task ran
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 2)
 
 		// Setup A task
 		id, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Second),
+			Interval: testInterval,
 			RunOnce:  true,
 			TaskFunc: func() error {
 				doneCh <- struct{}{}
@@ -903,13 +957,18 @@ func TestSchedulerExtras(t *testing.T) {
 
 		// Make sure it runs especially when we want it too
 		for i := 0; i < 6; i++ {
+			timeout := testTimeout
+			if i >= 1 {
+				timeout = testNoRunTimeout
+			}
+
 			select {
 			case <-doneCh:
 				if i >= 1 {
 					t.Errorf("Task should not have exceeded 1, count is %d", i)
 				}
 				continue
-			case <-time.After(2 * time.Second):
+			case <-time.After(timeout):
 				if i == 1 {
 					return
 				}
@@ -923,23 +982,24 @@ func TestSchedulerExtras(t *testing.T) {
 
 	t.Run("Test ErrFunc gets called on errors", func(t *testing.T) {
 		// Create a channel to signal function exec
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 1)
 
 		// Add task
-		_, err := scheduler.Add(&Task{
-			Interval: time.Duration(1 * time.Second),
+		id, err := scheduler.Add(&Task{
+			Interval: testInterval,
 			TaskFunc: func() error { return fmt.Errorf("Errors are bad") },
 			ErrFunc:  func(_ error) { doneCh <- struct{}{} },
 		})
 		if err != nil {
 			t.Errorf("Unexpected errors when scheduling a valid task - %s", err)
 		}
+		defer scheduler.Del(id)
 
 		// Wait for success, or timeout
 		select {
 		case <-doneCh:
 			return
-		case <-time.After(2 * time.Second):
+		case <-time.After(testTimeout):
 			t.Errorf("Error function was not called when an error occurred")
 		}
 	})
@@ -956,12 +1016,13 @@ func TestSingleInstance(t *testing.T) {
 	// Create a second counter to track number of executions
 	counter2 := NewCounter()
 
-	// Create an error channel to signal failure
-	errCh := make(chan error)
+	// Create channels to signal task completion or failure.
+	doneCh := make(chan struct{}, 4)
+	errCh := make(chan error, 1)
 
 	// Add a task that will increment the counter
-	_, err := scheduler.Add(&Task{
-		Interval:          time.Duration(500 * time.Millisecond),
+	id, err := scheduler.Add(&Task{
+		Interval:          testInterval,
 		RunSingleInstance: true,
 		TaskFunc: func() error {
 			// Increment Concurrent Counter
@@ -972,11 +1033,12 @@ func TestSingleInstance(t *testing.T) {
 			// Increment Execution Counter
 			counter2.Inc()
 
-			// Wait for 10 seconds
-			<-time.After(5 * time.Second)
+			// Keep the task running long enough for overlapping ticks to be skipped.
+			<-time.After(125 * time.Millisecond)
 
 			// Decrement Concurrent Counter
 			counter.Dec()
+			doneCh <- struct{}{}
 			return nil
 		},
 		ErrFunc: func(e error) {
@@ -986,14 +1048,15 @@ func TestSingleInstance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected errors when scheduling task - %s", err)
 	}
+	defer scheduler.Del(id)
 
-	// Wait for tasks to run and if no error, then we are good
-	select {
-	case <-time.After(30 * time.Second):
-		if counter2.Val() < 4 {
+	for i := 0; i < 4; i++ {
+		select {
+		case <-doneCh:
+		case e := <-errCh:
+			t.Fatalf("Error function was called - %s", e)
+		case <-time.After(testTimeout):
 			t.Fatalf("Task was not called more than once successfully - count %d", counter2.Val())
 		}
-	case e := <-errCh:
-		t.Fatalf("Error function was called - %s", e)
 	}
 }

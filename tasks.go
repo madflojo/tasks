@@ -256,7 +256,7 @@ var (
 	ErrIDInUse = errors.New("ID already used")
 
 	// ErrMissingTaskFunc is returned when a task has no executable callback.
-	ErrMissingTaskFunc = errors.New("task function cannot be nil")
+	ErrMissingTaskFunc = errors.New("either TaskFunc or FuncWithTaskContext must be provided")
 
 	// ErrInvalidInterval is returned when a task interval is not greater than zero.
 	ErrInvalidInterval = errors.New("task interval must be greater than zero")

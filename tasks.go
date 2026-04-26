@@ -259,7 +259,7 @@ var (
 	ErrMissingTaskFunc = errors.New("task function cannot be nil")
 
 	// ErrInvalidInterval is returned when a task interval is not greater than zero.
-	ErrInvalidInterval = errors.New("task interval must be defined")
+	ErrInvalidInterval = errors.New("task interval must be greater than zero")
 
 	// ErrTaskNotFound is returned when a task ID does not exist in the scheduler.
 	ErrTaskNotFound = errors.New("task not found")

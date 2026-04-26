@@ -492,7 +492,7 @@ func TestAdd(t *testing.T) {
 			if id != tc.wantID {
 				t.Fatalf("expected ID %q, got %q", tc.wantID, id)
 			}
-			if tc.lookupID != "" || tc.wantErr == ErrNilTask {
+			if tc.wantErr != nil {
 				lookupID := tc.lookupID
 				if lookupID == "" {
 					lookupID = id
@@ -699,8 +699,9 @@ func TestScheduler(t *testing.T) {
 				continue
 			case <-time.After(testTimeout):
 				t.Errorf(
-					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					"Scheduler failed to execute the scheduled tasks %d run within %v",
 					i,
+					testTimeout,
 				)
 			}
 		}
@@ -739,8 +740,9 @@ func TestScheduler(t *testing.T) {
 				continue
 			case <-time.After(testTimeout):
 				t.Errorf(
-					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					"Scheduler failed to execute the scheduled tasks %d run within %v",
 					i,
+					testTimeout,
 				)
 			}
 		}
@@ -863,8 +865,9 @@ func TestSchedulerDoesntRun(t *testing.T) {
 					return
 				}
 				t.Errorf(
-					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					"Scheduler failed to execute the scheduled tasks %d run within %v",
 					i,
+					timeout,
 				)
 			}
 		}
@@ -973,8 +976,9 @@ func TestSchedulerExtras(t *testing.T) {
 					return
 				}
 				t.Errorf(
-					"Scheduler failed to execute the scheduled tasks %d run within 2 seconds",
+					"Scheduler failed to execute the scheduled tasks %d run within %v",
 					i,
+					timeout,
 				)
 			}
 		}
@@ -1034,7 +1038,7 @@ func TestSingleInstance(t *testing.T) {
 			counter2.Inc()
 
 			// Keep the task running long enough for overlapping ticks to be skipped.
-			<-time.After(125 * time.Millisecond)
+			<-time.After(testInterval + testInterval/4)
 
 			// Decrement Concurrent Counter
 			counter.Dec()

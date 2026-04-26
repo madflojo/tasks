@@ -331,7 +331,7 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 		return ErrMissingTaskFunc
 	}
 
-	// Ensure Interval is never 0, this would cause Timer to panic
+	// Ensure Interval is positive to avoid immediate firing and tight rescheduling.
 	if t.Interval <= time.Duration(0) {
 		return ErrInvalidInterval
 	}

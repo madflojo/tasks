@@ -2,6 +2,7 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -182,7 +183,7 @@ func TestTasksInterface(t *testing.T) {
 				t.Run(tc.name+" - Duplicate Task", func(t *testing.T) {
 					// Schedule the task
 					err := scheduler.AddWithID(tc.id, tc.task)
-					if err != ErrIDInUse {
+					if !errors.Is(err, ErrIDInUse) {
 						t.Errorf("Expected errors when scheduling a duplicate task")
 					}
 				})
@@ -406,24 +407,24 @@ func TestAdd(t *testing.T) {
 
 	t.Run("Add a nil task returns ErrNilTask", func(t *testing.T) {
 		id, err := scheduler.Add(nil)
-		if err != ErrNilTask {
+		if !errors.Is(err, ErrNilTask) {
 			t.Fatalf("expected ErrNilTask, got %v", err)
 		}
 		if id != "" {
 			t.Fatalf("expected empty ID for nil task, got %q", id)
 		}
-		if _, lookupErr := scheduler.Lookup(id); lookupErr == nil {
-			t.Fatalf("nil task should not be added to the scheduler")
+		if _, lookupErr := scheduler.Lookup(id); !errors.Is(lookupErr, ErrTaskNotFound) {
+			t.Fatalf("expected ErrTaskNotFound for nil task lookup, got %v", lookupErr)
 		}
 	})
 
 	t.Run("AddWithID a nil task returns ErrNilTask", func(t *testing.T) {
 		err := scheduler.AddWithID("nil-task", nil)
-		if err != ErrNilTask {
+		if !errors.Is(err, ErrNilTask) {
 			t.Fatalf("expected ErrNilTask, got %v", err)
 		}
-		if _, lookupErr := scheduler.Lookup("nil-task"); lookupErr == nil {
-			t.Fatalf("nil task should not be added to the scheduler")
+		if _, lookupErr := scheduler.Lookup("nil-task"); !errors.Is(lookupErr, ErrTaskNotFound) {
+			t.Fatalf("expected ErrTaskNotFound for nil task lookup, got %v", lookupErr)
 		}
 	})
 
@@ -494,7 +495,7 @@ func TestAdd(t *testing.T) {
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		})
-		if err != ErrIDInUse {
+		if !errors.Is(err, ErrIDInUse) {
 			t.Errorf("Expected error for task with existing id")
 		}
 
@@ -521,7 +522,7 @@ func TestAdd(t *testing.T) {
 		}
 
 		err = scheduler.AddWithID(id, task)
-		if err != ErrIDInUse {
+		if !errors.Is(err, ErrIDInUse) {
 			t.Fatalf("Expected duplicate id error, got %v", err)
 		}
 
@@ -591,8 +592,8 @@ func TestAdd(t *testing.T) {
 			Interval: time.Duration(1 * time.Minute),
 			ErrFunc:  func(_ error) {},
 		})
-		if err == nil {
-			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
+		if !errors.Is(err, ErrMissingTaskFunc) {
+			t.Errorf("expected ErrMissingTaskFunc when scheduling an invalid task, got %v", err)
 		}
 	})
 
@@ -601,8 +602,15 @@ func TestAdd(t *testing.T) {
 			TaskFunc: func() error { return nil },
 			ErrFunc:  func(_ error) {},
 		})
-		if err == nil {
-			t.Errorf("Unexpected success when scheduling an invalid task - %s", err)
+		if !errors.Is(err, ErrInvalidInterval) {
+			t.Errorf("expected ErrInvalidInterval when scheduling an invalid task, got %v", err)
+		}
+	})
+
+	t.Run("Lookup missing task returns ErrTaskNotFound", func(t *testing.T) {
+		_, err := scheduler.Lookup("missing-task")
+		if !errors.Is(err, ErrTaskNotFound) {
+			t.Fatalf("expected ErrTaskNotFound, got %v", err)
 		}
 	})
 }

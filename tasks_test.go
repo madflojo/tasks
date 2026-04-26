@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -608,9 +609,13 @@ func TestAdd(t *testing.T) {
 	})
 
 	t.Run("Lookup missing task returns ErrTaskNotFound", func(t *testing.T) {
-		_, err := scheduler.Lookup("missing-task")
+		const missingID = "missing-task"
+		_, err := scheduler.Lookup(missingID)
 		if !errors.Is(err, ErrTaskNotFound) {
 			t.Fatalf("expected ErrTaskNotFound, got %v", err)
+		}
+		if !strings.Contains(err.Error(), missingID) {
+			t.Errorf("expected error message to contain task ID %q, got %q", missingID, err.Error())
 		}
 	})
 }

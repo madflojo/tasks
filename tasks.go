@@ -222,6 +222,7 @@ type Task struct {
 	cancel context.CancelFunc
 }
 
+// TaskContext stores the user-defined context passed to task callbacks.
 type TaskContext struct {
 	// Context is a user-defined context.
 	Context context.Context

@@ -428,19 +428,10 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 	}
 
 	timer := time.AfterFunc(delay, func() {
-		var err error
-
-		// Verify if task has been cancelled before scheduling
 		t.safeOps(func() {
-			err = t.ctx.Err()
-		})
-		if err != nil {
-			// Task has been cancelled, do not schedule
-			return
-		}
-
-		// Schedule task
-		t.safeOps(func() {
+			if t.ctx.Err() != nil {
+				return
+			}
 			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
 		})
 	})

@@ -934,6 +934,59 @@ func TestSchedulerDoesntRun(t *testing.T) {
 	})
 }
 
+func TestStartAfterTimerLifecycle(t *testing.T) {
+	t.Run("Del stops delayed StartAfter timer", func(t *testing.T) {
+		scheduler := New()
+		defer scheduler.Stop()
+
+		id, err := scheduler.Add(&Task{
+			Interval:   testInterval,
+			StartAfter: time.Now().Add(time.Hour),
+			TaskFunc:   func() error { return nil },
+		})
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		task := scheduledTask(t, scheduler, id)
+		timer := taskTimer(t, task)
+
+		scheduler.Del(id)
+
+		if timer.Stop() {
+			t.Fatalf("expected Del to stop delayed StartAfter timer")
+		}
+		if _, err := scheduler.Lookup(id); !errors.Is(err, ErrTaskNotFound) {
+			t.Fatalf("expected deleted task lookup to return ErrTaskNotFound, got %v", err)
+		}
+	})
+
+	t.Run("Stop stops delayed StartAfter timer", func(t *testing.T) {
+		scheduler := New()
+
+		id, err := scheduler.Add(&Task{
+			Interval:   testInterval,
+			StartAfter: time.Now().Add(time.Hour),
+			TaskFunc:   func() error { return nil },
+		})
+		if err != nil {
+			t.Fatalf("Unexpected errors when scheduling a valid task - %s", err)
+		}
+
+		task := scheduledTask(t, scheduler, id)
+		timer := taskTimer(t, task)
+
+		scheduler.Stop()
+
+		if timer.Stop() {
+			t.Fatalf("expected Stop to stop delayed StartAfter timer")
+		}
+		if _, err := scheduler.Lookup(id); !errors.Is(err, ErrTaskNotFound) {
+			t.Fatalf("expected stopped task lookup to return ErrTaskNotFound, got %v", err)
+		}
+	})
+}
+
 func TestSchedulerExtras(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()
@@ -1063,4 +1116,29 @@ func TestSingleInstance(t *testing.T) {
 			t.Fatalf("Task was not called more than once successfully - count %d", counter2.Val())
 		}
 	}
+}
+
+func scheduledTask(t *testing.T, scheduler *Scheduler, id string) *Task {
+	t.Helper()
+
+	scheduler.RLock()
+	defer scheduler.RUnlock()
+
+	task, ok := scheduler.tasks[id]
+	if !ok {
+		t.Fatalf("expected scheduler to contain task %q", id)
+	}
+	return task
+}
+
+func taskTimer(t *testing.T, task *Task) *time.Timer {
+	t.Helper()
+
+	task.RLock()
+	defer task.RUnlock()
+
+	if task.timer == nil {
+		t.Fatalf("expected scheduled task to have a timer")
+	}
+	return task.timer
 }

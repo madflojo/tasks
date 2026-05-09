@@ -416,7 +416,18 @@ func (schd *Scheduler) Stop() {
 // scheduleTask creates the underlying scheduled task. If StartAfter is set, this routine will wait until the
 // time specified.
 func (schd *Scheduler) scheduleTask(t *Task) {
-	_ = time.AfterFunc(time.Until(t.StartAfter), func() {
+	delay := time.Until(t.StartAfter)
+	if delay <= 0 {
+		t.safeOps(func() {
+			if t.ctx.Err() != nil {
+				return
+			}
+			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
+		})
+		return
+	}
+
+	timer := time.AfterFunc(delay, func() {
 		var err error
 
 		// Verify if task has been cancelled before scheduling
@@ -432,6 +443,14 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 		t.safeOps(func() {
 			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
 		})
+	})
+
+	t.safeOps(func() {
+		if t.ctx.Err() != nil {
+			timer.Stop()
+			return
+		}
+		t.timer = timer
 	})
 }
 

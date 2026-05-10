@@ -35,6 +35,9 @@ go get github.com/madflojo/tasks
 Calling `Del` or `Stop` prevents delayed or future invocations, including tasks waiting on `StartAfter`. These methods do
 not interrupt task functions that have already started; once your callback is running, it gets to finish its lap.
 
+Error handlers run as part of a task's execution lifecycle. For `RunOnce` tasks, self-deletion happens after the task
+function and any configured error handler finish.
+
 ## Error Handling
 
 Scheduler validation and lookup errors are exposed as sentinel errors so callers can branch with `errors.Is`:
@@ -54,6 +57,9 @@ if errors.Is(err, tasks.ErrIDInUse) {
 
 If a task callback panics with a non-nil recovered value, Tasks recovers it and reports `ErrTaskPanic` through the task error callback.
 If the error callback itself panics, Tasks recovers and drops that panic.
+
+Error callbacks run in the same goroutine as the task execution. Slow error handlers extend the task lifecycle, including
+`RunOnce` deletion and `RunSingleInstance` overlap prevention.
 
 ## Usage
 

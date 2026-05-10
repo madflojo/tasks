@@ -1118,6 +1118,109 @@ func TestSingleInstance(t *testing.T) {
 	}
 }
 
+func TestSingleInstanceWaitsForErrorHandler(t *testing.T) {
+	scheduler := New()
+	defer scheduler.Stop()
+
+	errStarted := make(chan struct{})
+	releaseErr := make(chan struct{})
+	var runCount int32
+	errStartedOnce := sync.Once{}
+	releaseErrOnce := sync.Once{}
+	t.Cleanup(func() {
+		releaseErrOnce.Do(func() {
+			close(releaseErr)
+		})
+	})
+
+	id, err := scheduler.Add(&Task{
+		Interval:          testInterval,
+		RunSingleInstance: true,
+		TaskFunc: func() error {
+			atomic.AddInt32(&runCount, 1)
+			return fmt.Errorf("task failed")
+		},
+		ErrFunc: func(error) {
+			errStartedOnce.Do(func() {
+				close(errStarted)
+			})
+			<-releaseErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("Unexpected errors when scheduling task - %s", err)
+	}
+	defer scheduler.Del(id)
+
+	select {
+	case <-errStarted:
+	case <-time.After(testTimeout):
+		t.Fatalf("Error handler did not run")
+	}
+
+	<-time.After(testNoRunTimeout)
+
+	if got := atomic.LoadInt32(&runCount); got != 1 {
+		t.Fatalf("expected single task run while error handler is running, got %d", got)
+	}
+
+	releaseErrOnce.Do(func() {
+		close(releaseErr)
+	})
+}
+
+func TestRunOnceDeletesAfterErrorHandler(t *testing.T) {
+	scheduler := New()
+	defer scheduler.Stop()
+
+	errStarted := make(chan struct{})
+	releaseErr := make(chan struct{})
+	errStartedOnce := sync.Once{}
+	releaseErrOnce := sync.Once{}
+	t.Cleanup(func() {
+		releaseErrOnce.Do(func() {
+			close(releaseErr)
+		})
+	})
+
+	id, err := scheduler.Add(&Task{
+		Interval: testInterval,
+		RunOnce:  true,
+		TaskFunc: func() error {
+			return fmt.Errorf("task failed")
+		},
+		ErrFunc: func(error) {
+			errStartedOnce.Do(func() {
+				close(errStarted)
+			})
+			<-releaseErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("Unexpected errors when scheduling task - %s", err)
+	}
+	defer scheduler.Del(id)
+
+	select {
+	case <-errStarted:
+	case <-time.After(testTimeout):
+		t.Fatalf("Error handler did not run")
+	}
+
+	if _, err := scheduler.Lookup(id); err != nil {
+		t.Fatalf("expected RunOnce task to remain scheduled while error handler is running: %v", err)
+	}
+
+	releaseErrOnce.Do(func() {
+		close(releaseErr)
+	})
+
+	eventually(t, testTimeout, func() bool {
+		_, err := scheduler.Lookup(id)
+		return errors.Is(err, ErrTaskNotFound)
+	}, "expected RunOnce task to self delete after error handler returns")
+}
+
 func TestTaskPanicsReturnSentinelError(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -1290,8 +1393,8 @@ func TestErrFuncPanicsAreRecovered(t *testing.T) {
 func scheduledTask(t *testing.T, scheduler *Scheduler, id string) *Task {
 	t.Helper()
 
-	scheduler.RLock()
-	defer scheduler.RUnlock()
+	scheduler.mu.RLock()
+	defer scheduler.mu.RUnlock()
 
 	task, ok := scheduler.tasks[id]
 	if !ok {
@@ -1303,11 +1406,31 @@ func scheduledTask(t *testing.T, scheduler *Scheduler, id string) *Task {
 func taskTimer(t *testing.T, task *Task) *time.Timer {
 	t.Helper()
 
-	task.RLock()
-	defer task.RUnlock()
+	task.mu.RLock()
+	defer task.mu.RUnlock()
 
 	if task.timer == nil {
 		t.Fatalf("expected scheduled task to have a timer")
 	}
 	return task.timer
+}
+
+func eventually(t *testing.T, timeout time.Duration, condition func() bool, failure string) {
+	t.Helper()
+
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(testInterval)
+	defer ticker.Stop()
+
+	for {
+		if condition() {
+			return
+		}
+
+		select {
+		case <-deadline:
+			t.Fatal(failure)
+		case <-ticker.C:
+		}
+	}
 }

@@ -178,8 +178,8 @@ type Task struct {
 	// of the same task from running concurrently.
 	RunSingleInstance bool
 
-	// StartAfter is used to specify a start time for the scheduler. When set, tasks will wait for the specified
-	// time to start the schedule timer.
+	// StartAfter is used to specify when the task's interval schedule starts. When set to a future time, the task waits
+	// until StartAfter before starting its recurring interval timer.
 	StartAfter time.Time
 
 	// TaskFunc is the user defined function to execute as part of this task.
@@ -187,8 +187,8 @@ type Task struct {
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
 	TaskFunc func() error
 
-	// ErrFunc allows users to define a function that is called when tasks return an error. If ErrFunc is nil,
-	// errors from tasks will be ignored.
+	// ErrFunc allows users to define a function that is called when tasks return an error. If ErrFunc and
+	// ErrFuncWithTaskContext are nil, errors from tasks will be ignored.
 	//
 	// Either ErrFunc or ErrFuncWithTaskContext must be defined. If both are defined, ErrFuncWithTaskContext will be used.
 	ErrFunc func(error)
@@ -200,8 +200,8 @@ type Task struct {
 	FuncWithTaskContext func(TaskContext) error
 
 	// ErrFuncWithTaskContext allows users to define a function that is called when tasks return an error.
-	// If ErrFunc is nil, errors from tasks will be ignored. This function is used in place of ErrFunc with
-	// the difference in that it will pass the user defined context from the Task configurations.
+	// If ErrFunc and ErrFuncWithTaskContext are nil, errors from tasks will be ignored. This function is used in place
+	// of ErrFunc with the difference in that it will pass the user defined context from the Task configurations.
 	//
 	// Either ErrFunc or ErrFuncWithTaskContext must be defined. If both are defined, ErrFuncWithTaskContext will be used.
 	ErrFuncWithTaskContext func(TaskContext, error)
@@ -302,7 +302,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 	return id.String(), nil
 }
 
-// AddWithID will add a task with an ID to the task list and schedule it. It will return an error if the ID is in-use.
+// AddWithID will add a task with an ID to the task list and schedule it. It will return ErrIDInUse if the ID is in-use.
 // Once added, tasks will wait the defined time interval and then execute. This means a task with a 15 second interval
 // will be triggered 15 seconds after Add is complete. Not before or after (excluding typical machine time jitter).
 //
@@ -352,8 +352,8 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	return nil
 }
 
-// Del will unschedule the specified task and remove it from the task list. Deletion will prevent future invocations of
-// a task, but not interrupt a triggered task.
+// Del will unschedule the specified task and remove it from the task list. Deletion stops delayed or future
+// invocations of a task, but does not interrupt a task function that has already started.
 func (schd *Scheduler) Del(name string) {
 	schd.Lock()
 	t, ok := schd.tasks[name]
@@ -377,7 +377,8 @@ func (schd *Scheduler) Del(name string) {
 	}
 }
 
-// Lookup will find the specified task from the internal task list using the task ID provided.
+// Lookup will find the specified task from the internal task list using the task ID provided. It returns
+// ErrTaskNotFound when no task exists for the ID.
 //
 // The returned task is a copy of the scheduled task configuration. Scheduler-owned runtime state is intentionally
 // excluded from the returned task.
@@ -405,7 +406,8 @@ func (schd *Scheduler) Tasks() map[string]*Task {
 	return m
 }
 
-// Stop is used to unschedule and delete all tasks owned by the scheduler instance.
+// Stop is used to unschedule and delete all tasks owned by the scheduler instance. Stop prevents delayed or future
+// invocations, but does not interrupt task functions that have already started.
 func (schd *Scheduler) Stop() {
 	tt := schd.Tasks()
 	for n := range tt {

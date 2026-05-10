@@ -2,33 +2,38 @@
 
 [![tests](https://github.com/madflojo/tasks/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/madflojo/tasks/actions/workflows/tests.yml)
 [![codecov](https://codecov.io/gh/madflojo/tasks/graph/badge.svg?token=882QTXA7PX)](https://codecov.io/gh/madflojo/tasks)
-[![Go Report Card](https://goreportcard.com/badge/github.com/madflojo/tasks)](https://goreportcard.com/report/github.com/madflojo/tasks) 
+[![Go Report Card](https://goreportcard.com/badge/github.com/madflojo/tasks)](https://goreportcard.com/report/github.com/madflojo/tasks)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/madflojo/tasks)](https://pkg.go.dev/github.com/madflojo/tasks)
 
-Package tasks is an easy to use in-process scheduler for recurring tasks in Go. Tasks is focused on high frequency
-tasks that run quick, and often. The goal of Tasks is to support concurrent running tasks at scale without scheduler
-induced jitter.
+A small in-process scheduler for Go tasks that need to run on time.
 
-Tasks is focused on accuracy of task execution. To do this each task is called within it's own goroutine. This ensures 
-that long execution of a single invocation does not throw the schedule as a whole off track.
+Tasks is built for recurring, quick-running jobs where scheduler-induced jitter needs to stay low and the scheduler
+should stay out of the way. Each invocation runs in its own goroutine, so one slow task does not make the whole schedule
+trip over its shoelaces.
 
-For simplicity this task scheduler uses the time.Duration type to specify intervals. This allows for a simple interface 
-and flexible control over when tasks are executed.
+Use Tasks when you want recurring work without cron wiring, a worker fleet, or a pile of scheduling boilerplate.
+It is an in-process scheduler, not a durable queue or distributed job runner; if your process exits, your schedule exits
+with it. That tradeoff keeps the package small, fast, and easy to reason about.
+
+## Install
+
+```bash
+go get github.com/madflojo/tasks
+```
+
+## Why Tasks
+
+- **Accurate recurring execution**: Each invocation runs independently, so a long-running task does not block unrelated schedules.
+- **Small API**: Intervals use Go's `time.Duration`; no custom cron language required.
+- **Delayed and one-time runs**: Use `StartAfter` and `RunOnce` for jobs that should begin later or run just once.
+- **Overlap control**: Use `RunSingleInstance` to skip a run when the previous invocation is still working. No dogpiling.
+- **Task context support**: Pass user-defined context and task metadata into callbacks with `FuncWithTaskContext`, `ErrFuncWithTaskContext`, and `TaskContext.ID()`.
+- **Stable IDs and branchable errors**: Use `AddWithID` for deterministic identifiers and `errors.Is` for scheduler errors.
+
+## Lifecycle Guarantees
 
 Calling `Del` or `Stop` prevents delayed or future invocations, including tasks waiting on `StartAfter`. These methods do
-not interrupt task functions that have already started.
-
-## Key Features
-
-- **Concurrent Execution**: Tasks are executed in their own goroutines, ensuring accurate scheduling even when individual tasks take longer to complete.
-- **Optimized Goroutine Scheduling**: Tasks leverages Go's `time.AfterFunc()` function to reduce sleeping goroutines and optimize CPU scheduling.
-- **Flexible Task Intervals**: Tasks uses the `time.Duration` type to specify intervals, offering a simple interface and flexible control over task execution timing.
-- **Delayed Task Start**: Schedule tasks to start at a later time by specifying a start time, allowing for greater control over task execution.
-- **One-Time Tasks**: Schedule tasks to run only once by setting the `RunOnce` flag, ideal for single-use tasks or one-time actions.
-- **Single-Instance Tasks**: Prevent overlapping runs by setting `RunSingleInstance`, which skips a run if the previous invocation is still executing.
-- **Task Context Support**: Pass user-defined context and task metadata into callbacks with `FuncWithTaskContext`, `ErrFuncWithTaskContext`, and `TaskContext.ID()`.
-- **Custom Error Handling**: Define a custom error handling function to handle errors returned by tasks, enabling tailored error handling logic.
-- **Custom Task IDs**: Provide your own task IDs with `AddWithID` when you need deterministic identifiers.
+not interrupt task functions that have already started; once your callback is running, it gets to finish its lap.
 
 ## Error Handling
 
@@ -40,9 +45,15 @@ Scheduler validation and lookup errors are exposed as sentinel errors so callers
 - `ErrInvalidInterval`
 - `ErrTaskNotFound`
 
+```go
+if errors.Is(err, tasks.ErrIDInUse) {
+  // Pick another ID or update the existing task.
+}
+```
+
 ## Usage
 
-Here are some examples to help you get started with Tasks:
+Here are some examples to help you get Tasks doing useful work without much ceremony.
 
 ### Basic Usage
 
@@ -60,15 +71,15 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
 ### Delayed Scheduling
 
-Sometimes schedules need to started at a later time. This package provides the ability to start a task only after a 
-certain time. The below example shows this in practice. Deleting the task or stopping the scheduler before `StartAfter`
-prevents the delayed run from being scheduled.
+Sometimes schedules need to start later, not right now with a tiny starter pistol. Set `StartAfter` to delay the start
+of a task's interval schedule. Deleting the task or stopping the scheduler before `StartAfter` prevents the delayed run
+from being scheduled.
 
 ```go
 // Add a recurring task for every 30 days, starting 30 days from now
@@ -81,17 +92,16 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
 ### One-Time Tasks
 
-It is also common for applications to run a task only once. The below example shows scheduling a task to run only once 
-after waiting for 60 seconds.
+Some jobs only need one lap. The example below schedules a task to run once after waiting for 60 seconds.
 
 ```go
-// Add a one time only task for 60 seconds from now
+// Add a one-time task for 60 seconds from now
 id, err := scheduler.Add(&tasks.Task{
   Interval: 60 * time.Second,
   RunOnce:  true,
@@ -101,15 +111,14 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
 ### Custom Error Handling
 
-One powerful feature of Tasks is that it allows users to specify custom error handling. This is done by allowing users 
-to define a function that is called when a task returns an error. The below example shows scheduling a task that logs 
-when an error occurs.
+Tasks lets callers define custom error handling with a callback that runs when a task returns an error. The example
+below schedules a task that logs when things go sideways.
 
 If both `ErrFunc` and `ErrFuncWithTaskContext` are set, `ErrFuncWithTaskContext` is used.
 
@@ -126,13 +135,14 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
 ### Single-Instance Tasks
 
 Use `RunSingleInstance` when a task might take longer than its interval and overlapping executions should be skipped.
+No dogpiling, no duplicate workers stepping on each other.
 
 ```go
 id, err := scheduler.Add(&tasks.Task{
@@ -144,7 +154,7 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
@@ -167,13 +177,14 @@ id, err := scheduler.Add(&tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 
 ### Custom Task IDs
 
-Use `AddWithID` when you want to provide your own stable identifier for a task.
+Use `AddWithID` when you want to provide your own stable identifier for a task. Handy when "whatever ID the scheduler
+picked" is not quite descriptive enough for future you.
 
 ```go
 err := scheduler.AddWithID("nightly-report", &tasks.Task{
@@ -184,7 +195,7 @@ err := scheduler.AddWithID("nightly-report", &tasks.Task{
   },
 })
 if err != nil {
-  // Do Stuff
+  // Handle error
 }
 ```
 

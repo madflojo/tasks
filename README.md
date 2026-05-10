@@ -52,7 +52,7 @@ if errors.Is(err, tasks.ErrIDInUse) {
 }
 ```
 
-If a task callback panics, Tasks recovers it and reports `ErrTaskPanic` through the task error callback.
+If a task callback panics with a non-nil recovered value, Tasks recovers it and reports `ErrTaskPanic` through the task error callback.
 If the error callback itself panics, Tasks recovers and drops that panic.
 
 ## Usage

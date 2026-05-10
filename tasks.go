@@ -183,7 +183,7 @@ type Task struct {
 	StartAfter time.Time
 
 	// TaskFunc is the user defined function to execute as part of this task.
-	// Panics are recovered and surfaced as ErrTaskPanic.
+	// Panics with non-nil recovered values are surfaced as ErrTaskPanic.
 	//
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
 	TaskFunc func() error
@@ -196,7 +196,7 @@ type Task struct {
 
 	// FuncWithTaskContext is a user defined function to execute as part of this task. This function is used in
 	// place of TaskFunc with the difference in that it will pass the user defined context from the Task configurations.
-	// Panics are recovered and surfaced as ErrTaskPanic.
+	// Panics with non-nil recovered values are surfaced as ErrTaskPanic.
 	//
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
 	FuncWithTaskContext func(TaskContext) error
@@ -487,23 +487,17 @@ func (schd *Scheduler) execTask(t *Task) {
 }
 
 func runTask(t *Task) (err error) {
-	panicked := true
 	defer func() {
-		if panicked {
-			r := recover()
+		if r := recover(); r != nil {
 			err = fmt.Errorf("%w: %v", ErrTaskPanic, r)
 		}
 	}()
 
 	if t.FuncWithTaskContext != nil {
-		err = t.FuncWithTaskContext(t.TaskContext)
-		panicked = false
-		return err
+		return t.FuncWithTaskContext(t.TaskContext)
 	}
 
-	err = t.TaskFunc()
-	panicked = false
-	return err
+	return t.TaskFunc()
 }
 
 func runTaskErrorHandler(t *Task, err error) {

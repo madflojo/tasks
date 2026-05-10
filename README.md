@@ -44,6 +44,7 @@ Scheduler validation and lookup errors are exposed as sentinel errors so callers
 
 - `ErrNilTask`
 - `ErrIDInUse`
+- `ErrInvalidID`
 - `ErrMissingTaskFunc`
 - `ErrInvalidInterval`
 - `ErrTaskNotFound`

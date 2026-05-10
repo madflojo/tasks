@@ -15,6 +15,9 @@ that long execution of a single invocation does not throw the schedule as a whol
 For simplicity this task scheduler uses the time.Duration type to specify intervals. This allows for a simple interface 
 and flexible control over when tasks are executed.
 
+Calling `Del` or `Stop` prevents delayed or future invocations, including tasks waiting on `StartAfter`. These methods do
+not interrupt task functions that have already started.
+
 ## Key Features
 
 - **Concurrent Execution**: Tasks are executed in their own goroutines, ensuring accurate scheduling even when individual tasks take longer to complete.
@@ -26,6 +29,16 @@ and flexible control over when tasks are executed.
 - **Task Context Support**: Pass user-defined context and task metadata into callbacks with `FuncWithTaskContext`, `ErrFuncWithTaskContext`, and `TaskContext.ID()`.
 - **Custom Error Handling**: Define a custom error handling function to handle errors returned by tasks, enabling tailored error handling logic.
 - **Custom Task IDs**: Provide your own task IDs with `AddWithID` when you need deterministic identifiers.
+
+## Error Handling
+
+Scheduler validation and lookup errors are exposed as sentinel errors so callers can branch with `errors.Is`:
+
+- `ErrNilTask`
+- `ErrIDInUse`
+- `ErrMissingTaskFunc`
+- `ErrInvalidInterval`
+- `ErrTaskNotFound`
 
 ## Usage
 
@@ -54,7 +67,8 @@ if err != nil {
 ### Delayed Scheduling
 
 Sometimes schedules need to started at a later time. This package provides the ability to start a task only after a 
-certain time. The below example shows this in practice.
+certain time. The below example shows this in practice. Deleting the task or stopping the scheduler before `StartAfter`
+prevents the delayed run from being scheduled.
 
 ```go
 // Add a recurring task for every 30 days, starting 30 days from now
@@ -96,6 +110,8 @@ if err != nil {
 One powerful feature of Tasks is that it allows users to specify custom error handling. This is done by allowing users 
 to define a function that is called when a task returns an error. The below example shows scheduling a task that logs 
 when an error occurs.
+
+If both `ErrFunc` and `ErrFuncWithTaskContext` are set, `ErrFuncWithTaskContext` is used.
 
 ```go
 // Add a task with custom error handling

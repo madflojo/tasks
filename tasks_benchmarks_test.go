@@ -27,24 +27,17 @@ func BenchmarkTasks(b *testing.B) {
 		b.Fatalf("Unable to lookup newly added task - %s", err)
 	}
 
-	b.Run("Adding a scheduler", func(b *testing.B) {
+	b.Run("Adding and deleting a scheduled task", func(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := scheduler.Add(exampleTask)
+			id, err := scheduler.Add(exampleTask)
 			if err != nil {
 				b.Fatalf("Unable to add new scheduled task - %s", err)
 			}
+			scheduler.Del(id)
 		}
 	})
-
-	// Clear Excess Tasks
-	for id := range scheduler.Tasks() {
-		if id == taskID {
-			continue
-		}
-		scheduler.Del(id)
-	}
 
 	b.Run("Looking up a scheduled task", func(b *testing.B) {
 		b.ReportAllocs()

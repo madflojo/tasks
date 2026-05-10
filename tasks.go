@@ -487,17 +487,23 @@ func (schd *Scheduler) execTask(t *Task) {
 }
 
 func runTask(t *Task) (err error) {
+	panicked := true
 	defer func() {
-		if r := recover(); r != nil {
+		if panicked {
+			r := recover()
 			err = fmt.Errorf("%w: %v", ErrTaskPanic, r)
 		}
 	}()
 
 	if t.FuncWithTaskContext != nil {
-		return t.FuncWithTaskContext(t.TaskContext)
+		err = t.FuncWithTaskContext(t.TaskContext)
+		panicked = false
+		return err
 	}
 
-	return t.TaskFunc()
+	err = t.TaskFunc()
+	panicked = false
+	return err
 }
 
 func runTaskErrorHandler(t *Task, err error) {

@@ -1137,6 +1137,17 @@ func TestTaskPanicsReturnSentinelError(t *testing.T) {
 			},
 		},
 		{
+			name:       "TaskFunc panic nil",
+			errHandler: "basic",
+			wantDetail: "task panicked",
+			task: &Task{
+				Interval: testInterval,
+				TaskFunc: func() error {
+					panic(nil)
+				},
+			},
+		},
+		{
 			name:       "FuncWithTaskContext panic",
 			errHandler: "context",
 			wantDetail: "task context panic",

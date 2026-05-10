@@ -549,6 +549,27 @@ func TestAdd(t *testing.T) {
 
 	})
 
+	t.Run("AddWithID empty id returns ErrInvalidID without scheduling task", func(t *testing.T) {
+		scheduler := New()
+		defer scheduler.Stop()
+
+		err := scheduler.AddWithID("", &Task{
+			Interval: time.Minute,
+			TaskFunc: func() error { return nil },
+		})
+		if !errors.Is(err, ErrInvalidID) {
+			t.Fatalf("expected ErrInvalidID, got %v", err)
+		}
+
+		if tasks := scheduler.Tasks(); len(tasks) != 0 {
+			t.Fatalf("expected no scheduled tasks, got %d", len(tasks))
+		}
+
+		if _, err := scheduler.Lookup(""); !errors.Is(err, ErrTaskNotFound) {
+			t.Fatalf("expected Lookup(\"\") to return ErrTaskNotFound, got %v", err)
+		}
+	})
+
 	t.Run("Add a invalid task with an duplicate id and look it up", func(t *testing.T) {
 		// Setup A task
 		id, err := scheduler.Add(&Task{

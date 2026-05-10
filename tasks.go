@@ -259,6 +259,9 @@ var (
 	// ErrIDInUse is returned when a Task ID is specified but already used.
 	ErrIDInUse = errors.New("ID already used")
 
+	// ErrInvalidID is returned when AddWithID is called with an empty ID.
+	ErrInvalidID = errors.New("task ID cannot be empty")
+
 	// ErrMissingTaskFunc is returned when a task has no executable callback.
 	ErrMissingTaskFunc = errors.New("either TaskFunc or FuncWithTaskContext must be provided")
 
@@ -309,9 +312,10 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 	return id.String(), nil
 }
 
-// AddWithID will add a task with an ID to the task list and schedule it. It will return ErrIDInUse if the ID is in-use.
-// Once added, tasks will wait the defined time interval and then execute. This means a task with a 15 second interval
-// will be triggered 15 seconds after Add is complete. Not before or after (excluding typical machine time jitter).
+// AddWithID will add a task with an ID to the task list and schedule it. It will return ErrInvalidID if the ID is empty
+// or ErrIDInUse if the ID is in-use. Once added, tasks will wait the defined time interval and then execute. This means
+// a task with a 15 second interval will be triggered 15 seconds after Add is complete. Not before or after (excluding
+// typical machine time jitter).
 //
 //	// Add a task
 //	id := xid.New()
@@ -341,6 +345,10 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 	// Ensure Interval is positive to avoid immediate firing and tight rescheduling.
 	if t.Interval <= time.Duration(0) {
 		return ErrInvalidInterval
+	}
+
+	if id == "" {
+		return ErrInvalidID
 	}
 
 	// Check id is not in use, then add to task list and start background task

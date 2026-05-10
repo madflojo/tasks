@@ -1118,6 +1118,175 @@ func TestSingleInstance(t *testing.T) {
 	}
 }
 
+func TestTaskPanicsReturnSentinelError(t *testing.T) {
+	tests := []struct {
+		name       string
+		task       *Task
+		errHandler string
+		wantDetail string
+	}{
+		{
+			name:       "TaskFunc panic",
+			errHandler: "basic",
+			wantDetail: "task func panic",
+			task: &Task{
+				Interval: testInterval,
+				TaskFunc: func() error {
+					panic("task func panic")
+				},
+			},
+		},
+		{
+			name:       "FuncWithTaskContext panic",
+			errHandler: "context",
+			wantDetail: "task context panic",
+			task: &Task{
+				Interval:    testInterval,
+				TaskContext: TaskContext{Context: context.Background()},
+				FuncWithTaskContext: func(_ TaskContext) error {
+					panic("task context panic")
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scheduler := New()
+			defer scheduler.Stop()
+
+			doneCh := make(chan struct{}, 1)
+			switch tc.errHandler {
+			case "basic":
+				tc.task.ErrFunc = func(err error) {
+					if !errors.Is(err, ErrTaskPanic) {
+						t.Errorf("expected ErrTaskPanic, got %v", err)
+					}
+					if !strings.Contains(err.Error(), tc.wantDetail) {
+						t.Errorf("expected panic detail in error, got %q", err.Error())
+					}
+					doneCh <- struct{}{}
+				}
+			case "context":
+				tc.task.ErrFuncWithTaskContext = func(taskCtx TaskContext, err error) {
+					if taskCtx.Context == nil {
+						t.Errorf("expected task context to be preserved")
+					}
+					if !errors.Is(err, ErrTaskPanic) {
+						t.Errorf("expected ErrTaskPanic, got %v", err)
+					}
+					if !strings.Contains(err.Error(), tc.wantDetail) {
+						t.Errorf("expected panic detail in error, got %q", err.Error())
+					}
+					doneCh <- struct{}{}
+				}
+			}
+
+			_, err := scheduler.Add(tc.task)
+			if err != nil {
+				t.Fatalf("Unexpected errors when scheduling task - %s", err)
+			}
+
+			select {
+			case <-doneCh:
+			case <-time.After(testTimeout):
+				t.Fatalf("expected panic to be reported through error callback")
+			}
+		})
+	}
+}
+
+func TestErrFuncPanicsAreRecovered(t *testing.T) {
+	tests := []struct {
+		name       string
+		task       *Task
+		errHandler string
+	}{
+		{
+			name:       "ErrFunc panic",
+			errHandler: "basic",
+			task: &Task{
+				Interval: testInterval,
+				TaskFunc: func() error {
+					return fmt.Errorf("task failed")
+				},
+			},
+		},
+		{
+			name:       "ErrFuncWithTaskContext panic",
+			errHandler: "context",
+			task: &Task{
+				Interval:    testInterval,
+				TaskContext: TaskContext{Context: context.Background()},
+				FuncWithTaskContext: func(_ TaskContext) error {
+					return fmt.Errorf("task context failed")
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			scheduler := New()
+			defer scheduler.Stop()
+
+			errHandled := make(chan struct{}, 1)
+			followUpRan := make(chan struct{}, 1)
+
+			switch tc.errHandler {
+			case "basic":
+				tc.task.ErrFunc = func(err error) {
+					if err == nil {
+						t.Errorf("expected non-nil error")
+					}
+					defer func() {
+						errHandled <- struct{}{}
+						panic("err func panic")
+					}()
+				}
+			case "context":
+				tc.task.ErrFuncWithTaskContext = func(_ TaskContext, err error) {
+					if err == nil {
+						t.Errorf("expected non-nil error")
+					}
+					defer func() {
+						errHandled <- struct{}{}
+						panic("err func with context panic")
+					}()
+				}
+			}
+
+			_, err := scheduler.Add(tc.task)
+			if err != nil {
+				t.Fatalf("Unexpected errors when scheduling task - %s", err)
+			}
+
+			select {
+			case <-errHandled:
+			case <-time.After(testTimeout):
+				t.Fatalf("expected error handler to run")
+			}
+
+			_, err = scheduler.Add(&Task{
+				Interval: testInterval,
+				TaskFunc: func() error {
+					followUpRan <- struct{}{}
+					return nil
+				},
+			})
+			if err != nil {
+				t.Fatalf("Unexpected errors when scheduling follow-up task - %s", err)
+			}
+
+			select {
+			case <-followUpRan:
+			case <-time.After(testTimeout):
+				t.Fatalf("expected scheduler to keep running after recovered panic")
+			}
+		})
+	}
+}
+
 func scheduledTask(t *testing.T, scheduler *Scheduler, id string) *Task {
 	t.Helper()
 

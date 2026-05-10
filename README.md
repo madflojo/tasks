@@ -44,12 +44,16 @@ Scheduler validation and lookup errors are exposed as sentinel errors so callers
 - `ErrMissingTaskFunc`
 - `ErrInvalidInterval`
 - `ErrTaskNotFound`
+- `ErrTaskPanic`
 
 ```go
 if errors.Is(err, tasks.ErrIDInUse) {
   // Pick another ID or update the existing task.
 }
 ```
+
+If a task callback panics with a non-nil recovered value, Tasks recovers it and reports `ErrTaskPanic` through the task error callback.
+If the error callback itself panics, Tasks recovers and drops that panic.
 
 ## Usage
 

@@ -183,18 +183,20 @@ type Task struct {
 	StartAfter time.Time
 
 	// TaskFunc is the user defined function to execute as part of this task.
+	// Panics with non-nil recovered values are surfaced as ErrTaskPanic.
 	//
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
 	TaskFunc func() error
 
 	// ErrFunc allows users to define a function that is called when tasks return an error. If ErrFunc and
-	// ErrFuncWithTaskContext are nil, errors from tasks will be ignored.
+	// ErrFuncWithTaskContext are nil, errors from tasks will be ignored. Panics are recovered and ignored.
 	//
 	// Either ErrFunc or ErrFuncWithTaskContext must be defined. If both are defined, ErrFuncWithTaskContext will be used.
 	ErrFunc func(error)
 
 	// FuncWithTaskContext is a user defined function to execute as part of this task. This function is used in
 	// place of TaskFunc with the difference in that it will pass the user defined context from the Task configurations.
+	// Panics with non-nil recovered values are surfaced as ErrTaskPanic.
 	//
 	// Either TaskFunc or FuncWithTaskContext must be defined. If both are defined, FuncWithTaskContext will be used.
 	FuncWithTaskContext func(TaskContext) error
@@ -202,6 +204,7 @@ type Task struct {
 	// ErrFuncWithTaskContext allows users to define a function that is called when tasks return an error.
 	// If ErrFunc and ErrFuncWithTaskContext are nil, errors from tasks will be ignored. This function is used in place
 	// of ErrFunc with the difference in that it will pass the user defined context from the Task configurations.
+	// Panics are recovered and ignored.
 	//
 	// Either ErrFunc or ErrFuncWithTaskContext must be defined. If both are defined, ErrFuncWithTaskContext will be used.
 	ErrFuncWithTaskContext func(TaskContext, error)
@@ -263,6 +266,9 @@ var (
 
 	// ErrTaskNotFound is returned when a task ID does not exist in the scheduler.
 	ErrTaskNotFound = errors.New("task not found")
+
+	// ErrTaskPanic is returned when a user-supplied task callback panics.
+	ErrTaskPanic = errors.New("task panicked")
 )
 
 // New will create a new scheduler instance that allows users to create and manage tasks.
@@ -450,6 +456,10 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.
 func (schd *Scheduler) execTask(t *Task) {
 	go func() {
+		if t.RunOnce {
+			defer schd.Del(t.id)
+		}
+
 		if t.RunSingleInstance {
 			if !t.running.TryLock() {
 				// Skip execution if task is already running
@@ -458,24 +468,10 @@ func (schd *Scheduler) execTask(t *Task) {
 			defer t.running.Unlock()
 		}
 
-		// Execute task
-		var err error
-		if t.FuncWithTaskContext != nil {
-			err = t.FuncWithTaskContext(t.TaskContext)
-		} else {
-			err = t.TaskFunc()
-		}
+		// Execute task and recover panics from user code.
+		err := runTask(t)
 		if err != nil && (t.ErrFunc != nil || t.ErrFuncWithTaskContext != nil) {
-			if t.ErrFuncWithTaskContext != nil {
-				go t.ErrFuncWithTaskContext(t.TaskContext, err)
-			} else {
-				go t.ErrFunc(err)
-			}
-		}
-
-		// If RunOnce is set, delete the task after execution
-		if t.RunOnce {
-			defer schd.Del(t.id)
+			runTaskErrorHandler(t, err)
 		}
 	}()
 
@@ -487,6 +483,41 @@ func (schd *Scheduler) execTask(t *Task) {
 			}
 			t.timer.Reset(t.Interval)
 		})
+	}
+}
+
+func runTask(t *Task) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%w: %v", ErrTaskPanic, r)
+		}
+	}()
+
+	if t.FuncWithTaskContext != nil {
+		return t.FuncWithTaskContext(t.TaskContext)
+	}
+
+	return t.TaskFunc()
+}
+
+func runTaskErrorHandler(t *Task, err error) {
+	if t.ErrFuncWithTaskContext != nil {
+		go func() {
+			defer func() {
+				_ = recover()
+			}()
+			t.ErrFuncWithTaskContext(t.TaskContext, err)
+		}()
+		return
+	}
+
+	if t.ErrFunc != nil {
+		go func() {
+			defer func() {
+				_ = recover()
+			}()
+			t.ErrFunc(err)
+		}()
 	}
 }
 

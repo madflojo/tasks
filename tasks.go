@@ -298,15 +298,17 @@ func New() *Scheduler {
 //		// Do stuff
 //	}
 func (schd *Scheduler) Add(t *Task) (string, error) {
-	id := xid.New()
-	err := schd.AddWithID(id.String(), t)
-	if errors.Is(err, ErrIDInUse) {
-		return schd.Add(t)
+	for {
+		id := xid.New().String()
+		err := schd.AddWithID(id, t)
+		if errors.Is(err, ErrIDInUse) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		return id, nil
 	}
-	if err != nil {
-		return "", err
-	}
-	return id.String(), nil
 }
 
 // AddWithID will add a task with an ID to the task list and schedule it. It will return ErrIDInUse if the ID is in-use.
@@ -416,9 +418,15 @@ func (schd *Scheduler) Tasks() map[string]*Task {
 // Stop is used to unschedule and delete all tasks owned by the scheduler instance. Stop prevents delayed or future
 // invocations, but does not interrupt task functions that have already started.
 func (schd *Scheduler) Stop() {
-	tt := schd.Tasks()
-	for n := range tt {
-		schd.Del(n)
+	schd.mu.RLock()
+	ids := make([]string, 0, len(schd.tasks))
+	for id := range schd.tasks {
+		ids = append(ids, id)
+	}
+	schd.mu.RUnlock()
+
+	for _, id := range ids {
+		schd.Del(id)
 	}
 }
 

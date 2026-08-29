@@ -6,7 +6,8 @@ on:
     - name: Select rotating hunter cohort
       id: rotation
       run: |
-        week="$(date -u +%V)"
+        epoch_days="$(($(date -u +%s) / 86400))"
+        week="$(((epoch_days + 3) / 7))"
         if [ "$((10#$week % 4))" -eq 1 ]; then
           echo "active=true" >> "$GITHUB_OUTPUT"
         else
@@ -25,7 +26,7 @@ jobs:
       rotation_active: ${{ steps.rotation.outputs.active }}
 
 concurrency:
-  group: code-hunters
+  group: code-hunters-testing-hunter
   cancel-in-progress: false
 
 imports:

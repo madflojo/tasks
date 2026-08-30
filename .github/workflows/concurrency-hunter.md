@@ -67,12 +67,12 @@ Finds reproducible concurrency defects and applies minimal synchronization or li
 5. Meet every common and hunter-specific evidence requirement before editing. Require
    high-confidence evidence that directly supports both the finding and correction.
 6. For each accepted correction, create a stable finding fingerprint before editing. Use the exact
-   pull request body marker `<!-- code-hunters-finding: <primary-path>::<symbol-or-subsystem>::<root-cause> -->`,
+   pull request body line `Code-Hunters-Finding: <primary-path>::<symbol-or-subsystem>::<root-cause>`,
    replacing each placeholder with the primary repository-relative path, a stable symbol or
    subsystem, and a concise lowercase kebab-case normalized root cause. Use forward slashes in the
    path. Do not include hunter names, line numbers, commit hashes, or other unstable details.
 7. Refresh remote state before editing each accepted correction and search open pull request bodies
-   for `code-hunters-finding:`. Skip an exact fingerprint match. Even without an exact marker,
+   for `Code-Hunters-Finding:`. Skip an exact fingerprint match. Even without an exact marker,
    inspect open pull requests and accessible issues that touch the same path, symbol, subsystem, or
    behavior, and skip equivalent or overlapping work.
 8. Implement within the common and hunter-specific change boundaries. Add or update tests for new
@@ -88,7 +88,7 @@ Finds reproducible concurrency defects and applies minimal synchronization or li
    becomes unavailable at this final gate, do not open the pull request; preserve the validated
    local change and report the delivery limitation.
 12. Use branch prefix `code-hunters/concurrency-hunter/`. Include exactly one stable finding marker
-   from step 6 and exact hidden marker `<!-- code-hunters-origin -->` in every pull request body.
+   from step 6 and exact visible line `Code-Hunters-Origin: github-actions` in every pull request body.
    Attempt to apply labels `Code Hunters` and `Code Hunters - Concurrency Hunter`.
    If a label is missing, attempt to create it when authorized.
    Label creation or application failure is non-blocking: warn, continue, and preserve branch and
@@ -314,8 +314,8 @@ End every run with a concise report containing:
 - Use the `create_pull_request` safe output separately for each validated correction, never exceeding
   the available run or repository capacity. Use the required Conventional Commit format for both
   `title` and `commit_message` when the tool supports the latter. Include exactly one
-  `<!-- code-hunters-finding: <primary-path>::<symbol-or-subsystem>::<root-cause> -->` marker and one
-  `<!-- code-hunters-origin -->` marker in every pull request body so deduplication and capacity
+  `Code-Hunters-Finding: <primary-path>::<symbol-or-subsystem>::<root-cause>` line and one
+  `Code-Hunters-Origin: github-actions` line in every pull request body so deduplication and capacity
   checks remain reliable without labels.
 - Include both Code Hunters labels only when they exist or were created successfully. Label setup
   is best-effort; omit unavailable labels and continue with branch and body-marker provenance.

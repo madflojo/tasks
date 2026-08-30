@@ -1,6 +1,6 @@
 ---
 on:
-  schedule: weekly on saturday
+  schedule: weekly on friday
   workflow_dispatch:
   steps:
     - name: Select rotating hunter cohort
@@ -14,7 +14,7 @@ on:
           echo "active=false" >> "$GITHUB_OUTPUT"
         fi
   skip-if-match:
-    query: 'is:pr is:open author:app/github-actions in:body "code-hunters-origin"'
+    query: 'is:pr is:open author:app/github-actions in:body "Code-Hunters-Origin: github-actions"'
     # Default total-open limit. Change only through explicit operator configuration.
     max: 10
 

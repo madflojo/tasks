@@ -485,6 +485,43 @@ func TestAddWithIDRejectsEmptyID(t *testing.T) {
 	}
 }
 
+func TestDelUnknownIDIsNoOp(t *testing.T) {
+	scheduler := newTestScheduler(t)
+
+	// Add a real task so we can confirm Del on an unrelated ID leaves it untouched.
+	keptID := mustAddTask(t, scheduler, validTask())
+
+	// Deleting an ID that was never added must not panic and must not affect other tasks.
+	scheduler.Del("never-added-id")
+
+	if _, err := scheduler.Lookup(keptID); err != nil {
+		t.Fatalf("expected unrelated task to remain scheduled, got %v", err)
+	}
+	if tasks := scheduler.Tasks(); len(tasks) != 1 {
+		t.Fatalf("expected 1 scheduled task, got %d", len(tasks))
+	}
+}
+
+func TestDelIsIdempotent(t *testing.T) {
+	scheduler := newTestScheduler(t)
+
+	id, err := scheduler.Add(validTask())
+	if err != nil {
+		t.Fatalf("expected add to succeed, got %v", err)
+	}
+
+	scheduler.Del(id)
+	if _, err := scheduler.Lookup(id); !errors.Is(err, ErrTaskNotFound) {
+		t.Fatalf("expected ErrTaskNotFound after first Del, got %v", err)
+	}
+
+	// Calling Del again on an already-deleted ID must be safe and not panic.
+	scheduler.Del(id)
+	if _, err := scheduler.Lookup(id); !errors.Is(err, ErrTaskNotFound) {
+		t.Fatalf("expected ErrTaskNotFound after second Del, got %v", err)
+	}
+}
+
 func TestScheduler(t *testing.T) {
 	// Create a base scheduler to use
 	scheduler := New()

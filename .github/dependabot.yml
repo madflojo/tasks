@@ -11,6 +11,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # gh-aw lockfiles are generated as a matched compiler/runtime set.
+      - dependency-name: "github/gh-aw-actions/setup"
     commit-message:
       prefix: "ci"
       include: "scope"

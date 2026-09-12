@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.1](https://github.com/madflojo/tasks/compare/v1.3.0...v1.3.1) (2026-09-12)
+
+
+### Bug Fixes
+
+* **ci:** keep gh-aw runtime pins in sync 🧷 ([#63](https://github.com/madflojo/tasks/issues/63)) ([1588eb8](https://github.com/madflojo/tasks/commit/1588eb89159a73b115cc55702cb05e2cd3ce14b4))
+* **ci:** preserve hunter rotation continuity ([d9b438f](https://github.com/madflojo/tasks/commit/d9b438f7cd6795c83ae4b82b830b9786c9787f96))
+* **workflows:** address Code Hunters review feedback ([3771dcf](https://github.com/madflojo/tasks/commit/3771dcf7523dd685a77e642432b647b4d4531e1c))
+* **workflows:** address hunter review feedback 🐇 ([0bcc39c](https://github.com/madflojo/tasks/commit/0bcc39cada25f4c520c3eca18325bcbeced4ee94))
+
 ## [1.3.0](https://github.com/madflojo/tasks/compare/v1.2.1...v1.3.0) (2026-05-10)
 
 

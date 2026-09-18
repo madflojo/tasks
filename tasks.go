@@ -443,23 +443,11 @@ func (schd *Scheduler) Stop() {
 func (schd *Scheduler) scheduleTask(t *Task) {
 	delay := time.Until(t.StartAfter)
 	if delay <= 0 {
-		t.safeOps(func() {
-			if t.ctx.Err() != nil {
-				return
-			}
-			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
-		})
+		schd.armIntervalTimer(t)
 		return
 	}
 
-	timer := time.AfterFunc(delay, func() {
-		t.safeOps(func() {
-			if t.ctx.Err() != nil {
-				return
-			}
-			t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
-		})
-	})
+	timer := time.AfterFunc(delay, func() { schd.armIntervalTimer(t) })
 
 	t.safeOps(func() {
 		if t.ctx.Err() != nil {
@@ -467,6 +455,16 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 			return
 		}
 		t.timer = timer
+	})
+}
+
+// armIntervalTimer starts the task's recurring interval timer, unless the task has already been canceled.
+func (schd *Scheduler) armIntervalTimer(t *Task) {
+	t.safeOps(func() {
+		if t.ctx.Err() != nil {
+			return
+		}
+		t.timer = time.AfterFunc(t.Interval, func() { schd.execTask(t) })
 	})
 }
 

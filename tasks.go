@@ -320,8 +320,7 @@ func (schd *Scheduler) Add(t *Task) (string, error) {
 // typical machine time jitter).
 //
 //	// Add a task
-//	id := xid.New()
-//	err := scheduler.AddWithID(id, &tasks.Task{
+//	err := scheduler.AddWithID("nightly-report", &tasks.Task{
 //		Interval: time.Duration(30 * time.Second),
 //		TaskFunc: func() error {
 //			// Put your logic here

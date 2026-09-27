@@ -29,7 +29,10 @@ concurrency:
   group: code-hunters-performance-hunter
   cancel-in-progress: false
 
+timeout-minutes: 20
+
 imports:
+  - ../aw/hunter-runtime.md
   - uses: ./performance-hunter.md
     with:
       allowed-files: ["*.go", "go.*"]
@@ -38,7 +41,7 @@ imports:
       max-pull-requests-per-run: 5
 ---
 
-<!-- Generated from hunter.json. Do not edit directly. -->
+<!-- Adapted from Code Hunters. Preserve the repository runtime import when refreshing. -->
 
 # Run Performance Hunter
 

@@ -1348,3 +1348,65 @@ func attachPanickingErrFuncWithTaskContext(t *testing.T, task *Task, errHandled 
 		}()
 	}
 }
+
+// timerArmingContext signals cancellation checks made while holding the task lock.
+type timerArmingContext struct {
+	context.Context
+	checks chan struct{}
+}
+
+func (ctx timerArmingContext) Err() error {
+	ctx.checks <- struct{}{}
+	return ctx.Context.Err()
+}
+
+func TestStartAfterIntervalTimerOwnership(t *testing.T) {
+	for _, stop := range []struct {
+		name string
+		fn   func(*Scheduler, string)
+	}{
+		{"Del", (*Scheduler).Del},
+		{"Stop", func(s *Scheduler, _ string) { s.Stop() }},
+	} {
+		t.Run(stop.name, func(t *testing.T) {
+			scheduler := New()
+			defer scheduler.Stop()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			checks := make(chan struct{}, 4)
+			task := &Task{
+				id: "delayed", Interval: time.Hour,
+				StartAfter: time.Now().Add(time.Hour),
+				ctx:        timerArmingContext{Context: ctx, checks: checks}, cancel: cancel,
+				TaskFunc: func() error { return nil },
+			}
+			scheduler.tasks[task.id] = task
+			scheduler.scheduleTask(task)
+			if !taskTimer(t, task).Reset(0) {
+				t.Fatal("delay timer was not active before triggering its callback")
+			}
+			timeout := time.NewTimer(testTimeout)
+			defer timeout.Stop()
+			// Wait for both the delay publication and the interval arming check.
+			for i := 0; i < 2; i++ {
+				select {
+				case <-checks:
+				case <-timeout.C:
+					t.Fatal("interval timer was not armed")
+				}
+			}
+			timer := taskTimer(t, task)
+			if !timer.Reset(time.Hour) {
+				t.Fatal("task retained an expired delay timer instead of the active interval timer")
+			}
+			stop.fn(scheduler, task.id)
+			if timer.Stop() {
+				t.Fatal("cancellation did not stop the interval timer")
+			}
+			scheduler.armIntervalTimer(task)
+			if taskTimer(t, task) != timer {
+				t.Fatal("canceled delay callback replaced the stopped timer")
+			}
+		})
+	}
+}

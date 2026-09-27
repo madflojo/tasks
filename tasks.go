@@ -446,14 +446,12 @@ func (schd *Scheduler) scheduleTask(t *Task) {
 		return
 	}
 
-	timer := time.AfterFunc(delay, func() { schd.armIntervalTimer(t) })
-
 	t.safeOps(func() {
 		if t.ctx.Err() != nil {
-			timer.Stop()
 			return
 		}
-		t.timer = timer
+		// Publish the delay timer before its callback can replace it with the interval timer.
+		t.timer = time.AfterFunc(delay, func() { schd.armIntervalTimer(t) })
 	})
 }
 

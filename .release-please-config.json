@@ -12,7 +12,7 @@
       "changelog-path": "CHANGELOG.md"
     }
   },
-  "changelog-types": [
+  "changelog-sections": [
     {"type":"feat","section":"Features","hidden":false},
     {"type":"fix","section":"Bug Fixes","hidden":false},
     {"type":"perf","section":"Performance Improvements","hidden":false},

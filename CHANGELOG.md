@@ -12,6 +12,34 @@
 * **workflows:** address hunter review feedback 🐇 ([0bcc39c](https://github.com/madflojo/tasks/commit/0bcc39cada25f4c520c3eca18325bcbeced4ee94))
 * **workflows:** keep hunter downloads and investigation on track ([a31f93e](https://github.com/madflojo/tasks/commit/a31f93e94c7d2d5fc569477575ad26f8145b9f40))
 
+
+### Documentation
+
+* **tasks:** fix non-compiling AddWithID godoc example ([#67](https://github.com/madflojo/tasks/pull/67)) ([ab4fc9d](https://github.com/madflojo/tasks/commit/ab4fc9d0a909749f31300fdf0e2317bed51b32ff))
+
+### Code Refactoring
+
+* **scheduler:** consolidate duplicated timer arming logic ([#65](https://github.com/madflojo/tasks/pull/65)) ([cc8762d](https://github.com/madflojo/tasks/commit/cc8762d640cef585cc76f98624db663cf853671f))
+
+### Tests
+
+* **scheduler:** cover Del no-op and idempotent paths ([23c6897](https://github.com/madflojo/tasks/commit/23c68978725bf92fb6a3e043e94ef437ca390872))
+
+### Continuous Integration
+
+* **deps:** bump codecov/codecov-action from 7.1.0 to 7.1.1 ([#68](https://github.com/madflojo/tasks/pull/68)) ([31974bd](https://github.com/madflojo/tasks/commit/31974bd33cb5c353f3ada0d577927b9425446fa7))
+* **deps:** bump codecov/codecov-action from 7.0.0 to 7.1.0 ([#64](https://github.com/madflojo/tasks/pull/64)) ([fc57423](https://github.com/madflojo/tasks/commit/fc57423adaf7b4bc1be7adf87f79a1e4904f23fc))
+* **deps:** bump github/gh-aw-actions/setup from 0.86.2 to 0.88.0 ([3bb3e83](https://github.com/madflojo/tasks/commit/3bb3e83b7ef487379e46dab60cfd4c0e0450d21a))
+* **code-hunters:** schedule rotating maintenance hunts ([0b76c13](https://github.com/madflojo/tasks/commit/0b76c1333f106a65dab3a2a4b7fa14afdd9d785f))
+* **deps:** bump actions/checkout from 7.0.0 to 7.0.1 ([1b98cdd](https://github.com/madflojo/tasks/commit/1b98cdd2d8ae9796b454409f4256b3a94d9d18d0))
+* **deps:** bump actions/setup-go from 6.4.0 to 7.0.0 ([a1a03f3](https://github.com/madflojo/tasks/commit/a1a03f31f0a1acca64b66eabaf3479ebcfd6faa8))
+* **deps:** bump golangci/golangci-lint-action from 9.2.1 to 9.3.0 ([35e5b3f](https://github.com/madflojo/tasks/commit/35e5b3f485138d2ff7d45ff325579b797c362aec))
+* **deps:** bump actions/checkout from 6.0.3 to 7.0.0 ([17210fe](https://github.com/madflojo/tasks/commit/17210fe5792da5c87f73a6d8a969f35e1572a236))
+* **deps:** bump codecov/codecov-action from 6.0.1 to 7.0.0 ([6976241](https://github.com/madflojo/tasks/commit/697624178246e50299b4c6e2263d3c62e255af79))
+* **deps:** bump actions/checkout from 6.0.2 to 6.0.3 ([f52bd6a](https://github.com/madflojo/tasks/commit/f52bd6a0e0ecdcf894065e2f0275cc06770b6a18))
+* **deps:** bump codecov/codecov-action from 6.0.0 to 6.0.1 ([0229312](https://github.com/madflojo/tasks/commit/0229312103987e2359301bdcb1f7223939335322))
+* **deps:** bump golangci/golangci-lint-action from 9.2.0 to 9.2.1 ([f23048e](https://github.com/madflojo/tasks/commit/f23048eba3eb9159cf160dfca6f6f8385b56ca25))
+
 ## [1.3.0](https://github.com/madflojo/tasks/compare/v1.2.1...v1.3.0) (2026-05-10)
 
 

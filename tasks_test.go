@@ -993,6 +993,57 @@ func TestSingleInstanceWaitsForErrorHandler(t *testing.T) {
 	})
 }
 
+func TestRunOncePreservesReplacement(t *testing.T) {
+	for _, replaceInErrorHandler := range []bool{false, true} {
+		t.Run(fmt.Sprintf("error handler=%t", replaceInErrorHandler), func(t *testing.T) {
+			scheduler := newTestScheduler(t)
+			const id = "replaceable"
+			replaced := make(chan error, 1)
+			ran := make(chan struct{}, 1)
+			replace := func() {
+				scheduler.Del(id)
+				replaced <- scheduler.AddWithID(id, &Task{
+					Interval: testInterval,
+					TaskFunc: func() error {
+						select {
+						case ran <- struct{}{}:
+						default:
+						}
+						return nil
+					},
+				})
+			}
+			task := &Task{
+				Interval: testInterval,
+				RunOnce:  true,
+				TaskFunc: func() error {
+					if replaceInErrorHandler {
+						return errors.New("retry with a replacement")
+					}
+					replace()
+					return nil
+				},
+				ErrFunc: func(_ error) { replace() },
+			}
+			if err := scheduler.AddWithID(id, task); err != nil {
+				t.Fatal(err)
+			}
+			select {
+			case err := <-replaced:
+				if err != nil {
+					t.Fatal(err)
+				}
+			case <-time.After(testTimeout):
+				t.Fatal("original task did not register its replacement")
+			}
+			waitForSignal(t, ran, testTimeout, "replacement task did not run")
+			if _, err := scheduler.Lookup(id); err != nil {
+				t.Fatalf("replacement task was removed: %v", err)
+			}
+		})
+	}
+}
+
 func TestRunOnceDeletesAfterErrorHandler(t *testing.T) {
 	scheduler := New()
 	defer scheduler.Stop()

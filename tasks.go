@@ -371,9 +371,13 @@ func (schd *Scheduler) AddWithID(id string, t *Task) error {
 // Del will unschedule the specified task and remove it from the task list. Deletion stops delayed or future
 // invocations of a task, but does not interrupt a task function that has already started.
 func (schd *Scheduler) Del(name string) {
+	schd.del(name, nil)
+}
+
+func (schd *Scheduler) del(name string, expected *Task) {
 	schd.mu.Lock()
 	t, ok := schd.tasks[name]
-	if !ok {
+	if !ok || (expected != nil && t != expected) {
 		schd.mu.Unlock()
 		return
 	}
@@ -469,7 +473,7 @@ func (schd *Scheduler) armIntervalTimer(t *Task) {
 func (schd *Scheduler) execTask(t *Task) {
 	go func() {
 		if t.RunOnce {
-			defer schd.Del(t.id)
+			defer schd.del(t.id, t)
 		}
 
 		if t.RunSingleInstance {

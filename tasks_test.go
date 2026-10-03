@@ -1461,3 +1461,25 @@ func TestStartAfterIntervalTimerOwnership(t *testing.T) {
 		})
 	}
 }
+
+func TestScheduleTaskSkipsCanceledDelayedTask(t *testing.T) {
+	scheduler := New()
+	defer scheduler.Stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	task := &Task{
+		id: "canceled", Interval: testInterval,
+		StartAfter: time.Now().Add(time.Hour),
+		ctx:        ctx, cancel: cancel,
+		TaskFunc: func() error { return nil },
+	}
+
+	scheduler.scheduleTask(task)
+
+	task.safeOps(func() {
+		if task.timer != nil {
+			task.timer.Stop()
+			t.Error("canceled task must not publish a delay timer")
+		}
+	})
+}

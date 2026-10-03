@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.3.2](https://github.com/madflojo/tasks/compare/v1.3.1...v1.3.2) (2026-10-03)
+
+
+### Bug Fixes
+
+* **release:** include all configured changelog sections ([4395136](https://github.com/madflojo/tasks/commit/4395136a1b1bd851aaf9b6b5d2e1dfdecec3970c))
+* **scheduler:** preserve replacements after RunOnce cleanup ([f40c92e](https://github.com/madflojo/tasks/commit/f40c92e01f053a35f89149ecf4c0eae64e2b175e))
+
+
+### Tests
+
+* **scheduler:** cover canceled delayed task scheduling - Testing Hunter ([a12b841](https://github.com/madflojo/tasks/commit/a12b841348857c702cd1c0e6dd1ae2ac3bda0cc2))
+
 ## [1.3.1](https://github.com/madflojo/tasks/compare/v1.3.0...v1.3.1) (2026-09-27)
 
 

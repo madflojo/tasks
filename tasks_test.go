@@ -1483,3 +1483,25 @@ func TestScheduleTaskSkipsCanceledDelayedTask(t *testing.T) {
 		}
 	})
 }
+
+func TestExecTaskSkipsCanceledTask(t *testing.T) {
+	schd := New()
+	defer schd.Stop()
+
+	var runs atomic.Int32
+	task := (&Task{
+		Interval: time.Hour,
+		TaskFunc: func() error {
+			runs.Add(1)
+			return nil
+		},
+	}).cloneForScheduling("canceled")
+	task.cancel()
+
+	schd.execTask(task)
+
+	time.Sleep(50 * time.Millisecond)
+	if got := runs.Load(); got != 0 {
+		t.Fatalf("canceled task executed %d times, want 0", got)
+	}
+}

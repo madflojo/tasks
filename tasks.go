@@ -471,6 +471,11 @@ func (schd *Scheduler) armIntervalTimer(t *Task) {
 
 // execTask is the underlying scheduler, it is used to trigger and execute tasks.
 func (schd *Scheduler) execTask(t *Task) {
+	// A timer callback can already be running when Del cancels the task; do not start work after cancelation.
+	if t.ctx.Err() != nil {
+		return
+	}
+
 	go func() {
 		if t.RunOnce {
 			defer schd.del(t.id, t)

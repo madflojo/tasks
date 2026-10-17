@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.3.2](https://github.com/madflojo/tasks/compare/v1.3.1...v1.3.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* **release:** include all configured changelog sections ([4395136](https://github.com/madflojo/tasks/commit/4395136a1b1bd851aaf9b6b5d2e1dfdecec3970c))
+* **scheduler:** preserve replacements after RunOnce cleanup ([f40c92e](https://github.com/madflojo/tasks/commit/f40c92e01f053a35f89149ecf4c0eae64e2b175e))
+* **scheduler:** skip execution of canceled tasks - Reliability Hunter ([2d9fdc3](https://github.com/madflojo/tasks/commit/2d9fdc3d09fd85004155ee443646829cd93428ad))
+* **scheduler:** skip execution of canceled tasks - Reliability Hunter ([826115f](https://github.com/madflojo/tasks/commit/826115f40865d3e04f3699ac7d66d4d556cce14e))
+
+
+### Tests
+
+* **scheduler:** cover canceled delayed task scheduling - Testing Hunter ([a12b841](https://github.com/madflojo/tasks/commit/a12b841348857c702cd1c0e6dd1ae2ac3bda0cc2))
+
+
+### Continuous Integration
+
+* **deps:** bump actions/download-artifact from 8.0.1 to 8.0.2 ([a10939d](https://github.com/madflojo/tasks/commit/a10939d5cc216e36c7d1c69fd07f0f98abbdc532))
+* **deps:** bump actions/download-artifact from 8.0.1 to 8.0.2 ([727ab9d](https://github.com/madflojo/tasks/commit/727ab9dec9a5e31e1a9d5dc3d76919bbc64fda8a))
+* **deps:** bump actions/setup-node from 7.0.0 to 7.1.0 ([7042ea3](https://github.com/madflojo/tasks/commit/7042ea31b177b04ec73a2aae27ba69c32a4023fc))
+* **deps:** bump actions/setup-node from 7.0.0 to 7.1.0 ([ceddccb](https://github.com/madflojo/tasks/commit/ceddccb2a187da432520034214ba49e80ac7e200))
+* **deps:** bump actions/upload-artifact from 7.0.1 to 7.0.2 ([f81b87a](https://github.com/madflojo/tasks/commit/f81b87ae5b7341ae0e9c33136a8362dd9bb914dd))
+* **deps:** bump actions/upload-artifact from 7.0.1 to 7.0.2 ([9ba5ee9](https://github.com/madflojo/tasks/commit/9ba5ee95d3822e2a28a330c74701e0fe81660486))
+
+
+### Miscellaneous Chores
+
+* **gomod:** bump go to 1.19 for atomic ([28f091a](https://github.com/madflojo/tasks/commit/28f091a4cb96416a8641b8fe8099525c752a85ce))
+
 ## [1.3.1](https://github.com/madflojo/tasks/compare/v1.3.0...v1.3.1) (2026-09-27)
 
 

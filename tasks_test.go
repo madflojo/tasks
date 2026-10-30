@@ -1505,3 +1505,32 @@ func TestExecTaskSkipsCanceledTask(t *testing.T) {
 		t.Fatalf("canceled task executed %d times, want 0", got)
 	}
 }
+
+func TestTasksReturnsIsolatedSnapshot(t *testing.T) {
+	scheduler := newTestScheduler(t)
+	id := mustAddTask(t, scheduler, validTask())
+
+	snapshot := scheduler.Tasks()
+	if len(snapshot) != 1 {
+		t.Fatalf("expected 1 task in snapshot, got %d", len(snapshot))
+	}
+	assertTaskHasNoRuntimeState(t, snapshot[id])
+
+	snapshot[id].Interval = time.Hour
+	delete(snapshot, id)
+	snapshot["injected"] = validTask()
+
+	got, err := scheduler.Lookup(id)
+	if err != nil {
+		t.Fatalf("expected task to remain scheduled after snapshot mutation, got %v", err)
+	}
+	if got.Interval != testInterval {
+		t.Errorf("expected interval %v to be unchanged, got %v", testInterval, got.Interval)
+	}
+	if _, err := scheduler.Lookup("injected"); !errors.Is(err, ErrTaskNotFound) {
+		t.Errorf("expected injected snapshot entry to stay out of scheduler, got %v", err)
+	}
+	if n := len(scheduler.Tasks()); n != 1 {
+		t.Errorf("expected scheduler to still hold 1 task, got %d", n)
+	}
+}

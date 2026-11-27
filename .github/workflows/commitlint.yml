@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   commitlint:
@@ -13,8 +12,25 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: wagoid/commitlint-github-action@b948419dd99f3fd78a6548d48f94e3df7f6bf3ed # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          configFile: .commitlintrc.yaml
+          node-version: '24'
+      - name: Install locked commitlint tools
+        run: |
+          mkdir "$RUNNER_TEMP/commitlint"
+          cp .github/commitlint/package.json .github/commitlint/package-lock.json "$RUNNER_TEMP/commitlint/"
+          npm ci --prefix "$RUNNER_TEMP/commitlint" --ignore-scripts --no-audit --no-fund
+      - name: Lint the full pull request commit range
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          NODE_PATH: ${{ runner.temp }}/commitlint/node_modules
+        run: |
+          git cat-file -e "$BASE_SHA^{commit}"
+          git cat-file -e "$HEAD_SHA^{commit}"
+          MERGE_BASE=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          node "$RUNNER_TEMP/commitlint/node_modules/@commitlint/cli/cli.js" \
+            --config .commitlintrc.yaml --from "$MERGE_BASE" --to "$HEAD_SHA" --verbose

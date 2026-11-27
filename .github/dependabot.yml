@@ -1,4 +1,4 @@
-# gh-aw setup and generated runtime lockfiles must be regenerated as a matched set.
+# Generated gh-aw workflows are updated by regeneration, not standalone action pin bumps.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -16,6 +16,8 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    exclude-paths:
+      - .github/workflows/*.lock.yml
   - package-ecosystem: npm
     directory: /.github/commitlint
     schedule:

@@ -1534,3 +1534,39 @@ func TestTasksReturnsIsolatedSnapshot(t *testing.T) {
 		t.Errorf("expected scheduler to still hold 1 task, got %d", n)
 	}
 }
+
+func TestStopRemovesAllTasksAndPreventsRuns(t *testing.T) {
+	scheduler := newTestScheduler(t)
+
+	var runs atomic.Int32
+	counter := func() error {
+		runs.Add(1)
+		return nil
+	}
+
+	ids := []string{
+		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), TaskFunc: counter}),
+		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), RunOnce: true, TaskFunc: counter}),
+		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), RunSingleInstance: true, TaskFunc: counter}),
+	}
+
+	scheduler.Stop()
+
+	if n := len(scheduler.Tasks()); n != 0 {
+		t.Errorf("expected no tasks after Stop, got %d", n)
+	}
+	for _, id := range ids {
+		if _, err := scheduler.Lookup(id); !errors.Is(err, ErrTaskNotFound) {
+			t.Errorf("expected ErrTaskNotFound for %s after Stop, got %v", id, err)
+		}
+	}
+
+	time.Sleep(testStartDelay + testNoRunTimeout)
+	if got := runs.Load(); got != 0 {
+		t.Errorf("expected no runs after Stop, got %d", got)
+	}
+
+	if _, err := scheduler.Add(validTask()); err != nil {
+		t.Errorf("expected scheduler to remain usable after Stop, got %v", err)
+	}
+}

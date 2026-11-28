@@ -1545,9 +1545,9 @@ func TestStopRemovesAllTasksAndPreventsRuns(t *testing.T) {
 	}
 
 	ids := []string{
-		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), TaskFunc: counter}),
-		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), RunOnce: true, TaskFunc: counter}),
-		mustAddTask(t, scheduler, &Task{Interval: time.Hour, StartAfter: time.Now().Add(testStartDelay), RunSingleInstance: true, TaskFunc: counter}),
+		mustAddTask(t, scheduler, &Task{Interval: testInterval, StartAfter: time.Now().Add(testStartDelay), TaskFunc: counter}),
+		mustAddTask(t, scheduler, &Task{Interval: testInterval, StartAfter: time.Now().Add(testStartDelay), RunOnce: true, TaskFunc: counter}),
+		mustAddTask(t, scheduler, &Task{Interval: testInterval, StartAfter: time.Now().Add(testStartDelay), RunSingleInstance: true, TaskFunc: counter}),
 	}
 
 	scheduler.Stop()

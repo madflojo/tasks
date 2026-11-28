@@ -1,19 +1,31 @@
+# Generated gh-aw workflows are updated by regeneration, not standalone action pin bumps.
 version: 2
 updates:
-  - package-ecosystem: "gomod"
-    directory: "/"
+  - package-ecosystem: gomod
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
     commit-message:
-      prefix: "chore"
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
+      prefix: chore
+  - package-ecosystem: github-actions
+    directory: /
     schedule:
-      interval: "weekly"
+      interval: weekly
     ignore:
-      # gh-aw lockfiles are generated as a matched compiler/runtime set.
-      - dependency-name: "github/gh-aw-actions/setup"
+      - dependency-name: github/gh-aw-actions/setup
     commit-message:
-      prefix: "ci"
-      include: "scope"
+      prefix: ci
+      include: scope
+    exclude-paths:
+      - .github/workflows/*.lock.yml
+  - package-ecosystem: npm
+    directory: /.github/commitlint
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      commitlint:
+        patterns:
+          - '*'
